@@ -1,0 +1,13 @@
+API_KEY.txt
+
+bin/
+obj/
+artifacts/
+TestResults/
+.vs/
+.vscode/
+.idea/
+.research/
+*.user
+*.suo
+

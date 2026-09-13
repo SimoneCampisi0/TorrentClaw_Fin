@@ -1,0 +1,269 @@
+<div id="tcSettingsPage"
+     data-role="page"
+     class="page type-interior pluginConfigurationPage tc-page tc-settings-page"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox"
+     data-controller="__plugin/TorrentClawSettings.js">
+    <link rel="stylesheet" href="configurationpage?name=TorrentClawSettings.css">
+
+    <div data-role="content">
+        <div class="content-primary tc-shell">
+
+            <header class="tc-header">
+                <div class="tc-header-text">
+                    <p class="tc-eyebrow">TorrentClaw</p>
+                    <h1 class="tc-title">Impostazioni</h1>
+                    <p class="tc-lead">Collegamenti a TorrentClaw e qBittorrent, directory di destinazione e filtri predefiniti della ricerca.</p>
+                </div>
+                <nav class="tc-nav" aria-label="Pagine TorrentClaw">
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch">Cerca</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads">Download</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings" aria-current="page">Impostazioni</a>
+                </nav>
+            </header>
+
+            <aside class="tc-notice" role="note">
+                <svg class="tc-notice-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+                <div>
+                    <p class="tc-notice-title">Come vengono conservate le credenziali</p>
+                    <p class="tc-notice-text">API key e password sono salvate nel file di configurazione del plugin sul server Jellyfin, protette dai permessi del filesystem e non cifrate. Non vengono mai restituite al browser: la pagina mostra solo se sono presenti.</p>
+                </div>
+            </aside>
+
+            <form id="tcSettingsForm" class="tc-settings-form" novalidate>
+
+                <section class="tc-section" aria-labelledby="tcTorrentClawTitle">
+                    <header class="tc-section-header">
+                        <h2 id="tcTorrentClawTitle" class="tc-section-title">TorrentClaw</h2>
+                        <p class="tc-section-text">Servizio di ricerca delle release. La API key viaggia solo nell'header delle richieste verso TorrentClaw.</p>
+                    </header>
+
+                    <div class="tc-field-grid">
+                        <div class="inputContainer tc-field tc-field-wide">
+                            <label class="inputLabel" for="tcTorrentClawUrl">URL del servizio</label>
+                            <input is="emby-input" id="tcTorrentClawUrl" type="url" required inputmode="url" autocomplete="off" spellcheck="false" aria-describedby="tcTorrentClawUrlHint tcTorrentClawUrlError">
+                            <p id="tcTorrentClawUrlHint" class="tc-hint">Solo HTTPS, senza credenziali nell'indirizzo. Predefinito: https://torrentclaw.com</p>
+                            <p id="tcTorrentClawUrlError" class="tc-field-error" hidden></p>
+                        </div>
+
+                        <div class="inputContainer tc-field tc-field-wide">
+                            <label class="inputLabel" for="tcTorrentClawApiKey">API key</label>
+                            <input is="emby-input" id="tcTorrentClawApiKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="tcApiKeyState tcTorrentClawApiKeyHint">
+                            <div class="tc-secret-row">
+                                <span id="tcApiKeyState" class="tc-secret-state" data-configured="false">Nessuna chiave salvata</span>
+                                <span id="tcTorrentClawApiKeyHint" class="tc-hint">Lascia vuoto per mantenere la chiave già salvata.</span>
+                            </div>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcTorrentClawTimeout">Timeout (secondi)</label>
+                            <input is="emby-input" id="tcTorrentClawTimeout" type="number" min="1" max="120" step="1" inputmode="numeric" aria-describedby="tcTorrentClawTimeoutError">
+                            <p id="tcTorrentClawTimeoutError" class="tc-field-error" hidden></p>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcTorrentClawRetries">Tentativi aggiuntivi</label>
+                            <input is="emby-input" id="tcTorrentClawRetries" type="number" min="0" max="3" step="1" inputmode="numeric" aria-describedby="tcTorrentClawRetriesHint tcTorrentClawRetriesError">
+                            <p id="tcTorrentClawRetriesHint" class="tc-hint">Solo per limiti di richieste (429) ed errori del server (5xx).</p>
+                            <p id="tcTorrentClawRetriesError" class="tc-field-error" hidden></p>
+                        </div>
+                    </div>
+
+                    <div class="tc-connection-row">
+                        <button is="emby-button" id="tcTestTorrentClaw" type="button" class="raised tc-test-button">
+                            <span>Verifica connessione</span>
+                        </button>
+                        <p id="tcTorrentClawResult" class="tc-connection-result" role="status" aria-live="polite" hidden></p>
+                    </div>
+                    <p class="tc-hint">La verifica salva prima le impostazioni correnti.</p>
+                </section>
+
+                <section class="tc-section" aria-labelledby="tcQbittorrentTitle">
+                    <header class="tc-section-header">
+                        <h2 id="tcQbittorrentTitle" class="tc-section-title">qBittorrent</h2>
+                        <p class="tc-section-text">Client che scarica le release scelte manualmente dalla pagina di ricerca.</p>
+                    </header>
+
+                    <div class="tc-field-grid">
+                        <div class="inputContainer tc-field tc-field-wide">
+                            <label class="inputLabel" for="tcQbittorrentUrl">URL della WebUI</label>
+                            <input is="emby-input" id="tcQbittorrentUrl" type="url" required inputmode="url" autocomplete="off" spellcheck="false" aria-describedby="tcQbittorrentUrlHint tcQbittorrentUrlError">
+                            <p id="tcQbittorrentUrlHint" class="tc-hint">HTTP o HTTPS, anche in rete locale. Esempio: http://127.0.0.1:8080</p>
+                            <p id="tcQbittorrentUrlError" class="tc-field-error" hidden></p>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcQbittorrentUsername">Nome utente</label>
+                            <input is="emby-input" id="tcQbittorrentUsername" type="text" autocomplete="username" spellcheck="false" maxlength="256">
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcQbittorrentPassword">Password</label>
+                            <input is="emby-input" id="tcQbittorrentPassword" type="password" autocomplete="new-password" aria-describedby="tcPasswordState tcQbittorrentPasswordHint">
+                            <div class="tc-secret-row">
+                                <span id="tcPasswordState" class="tc-secret-state" data-configured="false">Nessuna password salvata</span>
+                                <span id="tcQbittorrentPasswordHint" class="tc-hint">Lascia vuoto per mantenerla.</span>
+                            </div>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcQbittorrentCategory">Categoria</label>
+                            <input is="emby-input" id="tcQbittorrentCategory" type="text" autocomplete="off" maxlength="120" aria-describedby="tcQbittorrentCategoryHint">
+                            <p id="tcQbittorrentCategoryHint" class="tc-hint">Assegnata ai torrent aggiunti dal plugin.</p>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcQbittorrentTimeout">Timeout (secondi)</label>
+                            <input is="emby-input" id="tcQbittorrentTimeout" type="number" min="1" max="120" step="1" inputmode="numeric" aria-describedby="tcQbittorrentTimeoutError">
+                            <p id="tcQbittorrentTimeoutError" class="tc-field-error" hidden></p>
+                        </div>
+                    </div>
+
+                    <div class="tc-connection-row">
+                        <button is="emby-button" id="tcTestQbittorrent" type="button" class="raised tc-test-button">
+                            <span>Verifica connessione</span>
+                        </button>
+                        <p id="tcQbittorrentResult" class="tc-connection-result" role="status" aria-live="polite" hidden></p>
+                    </div>
+                    <p class="tc-hint">La verifica salva prima le impostazioni correnti.</p>
+                </section>
+
+                <section class="tc-section" aria-labelledby="tcPathsTitle">
+                    <header class="tc-section-header">
+                        <h2 id="tcPathsTitle" class="tc-section-title">Percorsi</h2>
+                        <p class="tc-section-text">Le directory devono esistere ed essere accessibili sia a qBittorrent sia a Jellyfin.</p>
+                    </header>
+
+                    <div class="tc-field-grid">
+                        <div class="inputContainer tc-field tc-field-wide">
+                            <label class="inputLabel" for="tcMoviePath">Directory film</label>
+                            <input is="emby-input" id="tcMoviePath" type="text" autocomplete="off" spellcheck="false" aria-describedby="tcMoviePathHint">
+                            <p id="tcMoviePathHint" class="tc-hint">Destinazione dei film; il completamento avvia l'aggiornamento della libreria.</p>
+                        </div>
+
+                        <div class="inputContainer tc-field tc-field-wide">
+                            <label class="inputLabel" for="tcTvPath">Directory serie TV</label>
+                            <input is="emby-input" id="tcTvPath" type="text" autocomplete="off" spellcheck="false" aria-describedby="tcTvPathHint">
+                            <p id="tcTvPathHint" class="tc-hint">Destinazione delle serie TV.</p>
+                        </div>
+
+                        <div class="inputContainer tc-field tc-field-wide">
+                            <label class="inputLabel" for="tcDownloadPath">Directory download</label>
+                            <input is="emby-input" id="tcDownloadPath" type="text" autocomplete="off" spellcheck="false" aria-describedby="tcDownloadPathHint">
+                            <p id="tcDownloadPathHint" class="tc-hint">Solo informativa: i torrent vengono salvati direttamente nelle directory film e serie TV.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tc-section" aria-labelledby="tcPreferencesTitle">
+                    <header class="tc-section-header">
+                        <h2 id="tcPreferencesTitle" class="tc-section-title">Preferenze</h2>
+                        <p class="tc-section-text">Valori proposti all'apertura della pagina di ricerca e frequenza di controllo dei download.</p>
+                    </header>
+
+                    <div class="tc-field-grid">
+                        <div class="selectContainer tc-field">
+                            <label class="selectLabel" for="tcPreferredResolution">Risoluzione</label>
+                            <select is="emby-select" id="tcPreferredResolution">
+                                <option value="">Nessuna preferenza</option>
+                                <option value="720p">720p</option>
+                                <option value="1080p">1080p</option>
+                                <option value="2160p">2160p (4K)</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer tc-field">
+                            <label class="selectLabel" for="tcPreferredCodec">Codec</label>
+                            <select is="emby-select" id="tcPreferredCodec">
+                                <option value="">Nessuna preferenza</option>
+                                <option value="AVC">H.264 / AVC</option>
+                                <option value="HEVC">H.265 / HEVC</option>
+                                <option value="AV1">AV1</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer tc-field">
+                            <label class="selectLabel" for="tcPreferredHdr">HDR</label>
+                            <select is="emby-select" id="tcPreferredHdr">
+                                <option value="">Nessuna preferenza</option>
+                                <option value="SDR">SDR</option>
+                                <option value="HDR10">HDR10</option>
+                                <option value="HDR10+">HDR10+</option>
+                                <option value="Dolby Vision">Dolby Vision</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer tc-field">
+                            <label class="selectLabel" for="tcPreferredAudioLanguage">Lingua audio</label>
+                            <select is="emby-select" id="tcPreferredAudioLanguage">
+                                <option value="">Qualsiasi</option>
+                                <option value="it">Italiano</option>
+                                <option value="en">Inglese</option>
+                                <option value="it,en">Italiano + Inglese</option>
+                                <option value="fr">Francese</option>
+                                <option value="es">Spagnolo</option>
+                                <option value="de">Tedesco</option>
+                                <option value="ja">Giapponese</option>
+                                <option value="pt">Portoghese</option>
+                                <option value="ru">Russo</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer tc-field">
+                            <label class="selectLabel" for="tcPreferredSubtitleLanguage">Sottotitoli</label>
+                            <select is="emby-select" id="tcPreferredSubtitleLanguage">
+                                <option value="">Qualsiasi</option>
+                                <option value="it">Italiano</option>
+                                <option value="en">Inglese</option>
+                                <option value="it,en">Italiano + Inglese</option>
+                                <option value="none">Nessun sottotitolo</option>
+                                <option value="fr">Francese</option>
+                                <option value="es">Spagnolo</option>
+                                <option value="de">Tedesco</option>
+                                <option value="ja">Giapponese</option>
+                                <option value="pt">Portoghese</option>
+                                <option value="ru">Russo</option>
+                            </select>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcMaxSize">Dimensione massima (GB)</label>
+                            <input is="emby-input" id="tcMaxSize" type="number" min="0" step="0.1" inputmode="decimal" aria-describedby="tcMaxSizeHint tcMaxSizeError">
+                            <p id="tcMaxSizeHint" class="tc-hint">0 o vuoto: nessun limite.</p>
+                            <p id="tcMaxSizeError" class="tc-field-error" hidden></p>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcMinSeeders">Seeders minimi</label>
+                            <input is="emby-input" id="tcMinSeeders" type="number" min="0" step="1" inputmode="numeric" aria-describedby="tcMinSeedersError">
+                            <p id="tcMinSeedersError" class="tc-field-error" hidden></p>
+                        </div>
+
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcPollSeconds">Controllo download (secondi)</label>
+                            <input is="emby-input" id="tcPollSeconds" type="number" min="10" max="300" step="1" inputmode="numeric" aria-describedby="tcPollSecondsHint tcPollSecondsError">
+                            <p id="tcPollSecondsHint" class="tc-hint">Ogni quanto il server interroga qBittorrent (10–300).</p>
+                            <p id="tcPollSecondsError" class="tc-field-error" hidden></p>
+                        </div>
+
+                        <div class="checkboxContainer tc-field tc-field-wide">
+                            <label>
+                                <input is="emby-checkbox" id="tcPreferRemux" type="checkbox">
+                                <span>Preferisci release REMUX</span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="tc-save-bar">
+                    <p id="tcSaveState" class="tc-save-state" role="status" aria-live="polite">Caricamento delle impostazioni…</p>
+                    <button is="emby-button" id="tcSaveButton" type="submit" class="raised button-submit tc-save-button">
+                        <span>Salva impostazioni</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

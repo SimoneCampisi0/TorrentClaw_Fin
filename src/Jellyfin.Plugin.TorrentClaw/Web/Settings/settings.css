@@ -1,0 +1,409 @@
+/*
+ * TorrentClaw · Settings page
+ * Every selector is scoped to .tc-settings-page so the stylesheet cannot leak into Jellyfin.
+ * Colours are derived from currentColor, so the page follows both light and dark Jellyfin themes.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Design tokens
+ * ------------------------------------------------------------------------ */
+
+.tc-settings-page {
+    --tc-accent: #00a4dc;
+    --tc-accent-solid: #0077a6;
+    --tc-accent-text: color-mix(in srgb, #00a4dc 55%, currentColor);
+    --tc-surface: color-mix(in srgb, currentColor 4%, transparent);
+    --tc-surface-strong: color-mix(in srgb, currentColor 8%, transparent);
+    --tc-border: color-mix(in srgb, currentColor 14%, transparent);
+    --tc-border-strong: color-mix(in srgb, currentColor 26%, transparent);
+    --tc-text-muted: color-mix(in srgb, currentColor 70%, transparent);
+    --tc-success: color-mix(in srgb, #2fa84f 50%, currentColor);
+    --tc-warning: color-mix(in srgb, #d99a1e 50%, currentColor);
+    --tc-danger: color-mix(in srgb, #e5484d 55%, currentColor);
+    --tc-radius-small: 6px;
+    --tc-radius-medium: 10px;
+    --tc-radius-large: 14px;
+    --tc-focus-ring: 0 0 0 3px color-mix(in srgb, #00a4dc 60%, transparent);
+}
+
+.tc-settings-page [hidden] {
+    display: none !important;
+}
+
+.tc-settings-page .tc-shell {
+    max-width: 58rem;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.tc-settings-page .tc-nav-link:focus-visible {
+    outline: none;
+    box-shadow: var(--tc-focus-ring);
+}
+
+/* ---------------------------------------------------------------------------
+ * Header, navigation and notice
+ * ------------------------------------------------------------------------ */
+
+.tc-settings-page .tc-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem 0 1.25rem;
+    border-bottom: 1px solid var(--tc-border);
+}
+
+.tc-settings-page .tc-eyebrow {
+    margin: 0 0 0.25rem;
+    color: var(--tc-accent-text);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.tc-settings-page .tc-title {
+    margin: 0;
+    font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.tc-settings-page .tc-lead {
+    max-width: 44rem;
+    margin: 0.375rem 0 0;
+    color: var(--tc-text-muted);
+    line-height: 1.5;
+}
+
+.tc-settings-page .tc-nav {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--tc-border);
+    border-radius: 999px;
+    background: var(--tc-surface);
+}
+
+.tc-settings-page .tc-nav-link {
+    padding: 0.45rem 0.95rem;
+    border-radius: 999px;
+    color: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
+}
+
+.tc-settings-page .tc-nav-link:hover {
+    background: var(--tc-surface-strong);
+}
+
+.tc-settings-page .tc-nav-link[aria-current="page"] {
+    background: var(--tc-accent-solid);
+    color: #ffffff;
+}
+
+.tc-settings-page .tc-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid color-mix(in srgb, #00a4dc 35%, transparent);
+    border-radius: var(--tc-radius-medium);
+    background: color-mix(in srgb, #00a4dc 8%, transparent);
+}
+
+.tc-settings-page .tc-notice-icon {
+    flex: none;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-top: 0.1rem;
+    color: var(--tc-accent-text);
+}
+
+.tc-settings-page .tc-notice-title {
+    margin: 0;
+    font-weight: 600;
+}
+
+.tc-settings-page .tc-notice-text {
+    margin: 0.2rem 0 0;
+    color: var(--tc-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+ * Sections and fields
+ * ------------------------------------------------------------------------ */
+
+.tc-settings-page .tc-settings-form {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.tc-settings-page .tc-section {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem 1.35rem;
+    border: 1px solid var(--tc-border);
+    border-radius: var(--tc-radius-large);
+    background: var(--tc-surface);
+}
+
+.tc-settings-page .tc-section-header {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--tc-border);
+}
+
+.tc-settings-page .tc-section-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.tc-settings-page .tc-section-text {
+    margin: 0.25rem 0 0;
+    color: var(--tc-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.tc-settings-page .tc-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem 1.25rem;
+}
+
+.tc-settings-page .tc-field.inputContainer,
+.tc-settings-page .tc-field.selectContainer,
+.tc-settings-page .tc-field.checkboxContainer {
+    min-width: 0;
+    margin: 0;
+}
+
+.tc-settings-page .tc-field-wide {
+    grid-column: 1 / -1;
+}
+
+.tc-settings-page .tc-hint {
+    margin: 0.35rem 0 0;
+    color: var(--tc-text-muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.tc-settings-page .tc-field-error {
+    margin: 0.35rem 0 0;
+    color: var(--tc-danger);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.tc-settings-page .tc-secret-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+    margin-top: 0.45rem;
+}
+
+.tc-settings-page .tc-secret-row .tc-hint {
+    margin: 0;
+}
+
+.tc-settings-page .tc-secret-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.12rem 0.6rem;
+    border: 1px solid var(--tc-border-strong);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tc-settings-page .tc-secret-state::before {
+    content: "○";
+}
+
+.tc-settings-page .tc-secret-state[data-configured="true"] {
+    border-color: color-mix(in srgb, #2fa84f 50%, transparent);
+    background: color-mix(in srgb, #2fa84f 11%, transparent);
+    color: var(--tc-success);
+}
+
+.tc-settings-page .tc-secret-state[data-configured="true"]::before {
+    content: "●";
+}
+
+/* ---------------------------------------------------------------------------
+ * Connection tests
+ * ------------------------------------------------------------------------ */
+
+.tc-settings-page .tc-connection-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--tc-border);
+}
+
+.tc-settings-page .tc-connection-row + .tc-hint {
+    margin-top: -0.6rem;
+}
+
+.tc-settings-page .tc-test-button {
+    margin: 0;
+}
+
+.tc-settings-page .tc-test-button:disabled,
+.tc-settings-page .tc-save-button:disabled {
+    cursor: progress;
+    opacity: 0.65;
+}
+
+.tc-settings-page .tc-connection-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--tc-border-strong);
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.tc-settings-page .tc-connection-result::before {
+    content: "…";
+}
+
+.tc-settings-page .tc-connection-result[data-tone="success"] {
+    border-color: color-mix(in srgb, #2fa84f 50%, transparent);
+    background: color-mix(in srgb, #2fa84f 11%, transparent);
+    color: var(--tc-success);
+}
+
+.tc-settings-page .tc-connection-result[data-tone="success"]::before {
+    content: "✓";
+}
+
+.tc-settings-page .tc-connection-result[data-tone="error"] {
+    border-color: color-mix(in srgb, #e5484d 55%, transparent);
+    background: color-mix(in srgb, #e5484d 11%, transparent);
+    color: var(--tc-danger);
+}
+
+.tc-settings-page .tc-connection-result[data-tone="error"]::before {
+    content: "!";
+}
+
+/* ---------------------------------------------------------------------------
+ * Save bar
+ * ------------------------------------------------------------------------ */
+
+.tc-settings-page .tc-save-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1.35rem;
+    border: 1px solid var(--tc-border-strong);
+    border-radius: var(--tc-radius-large);
+    background: var(--tc-surface-strong);
+}
+
+.tc-settings-page .tc-save-state {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    color: var(--tc-text-muted);
+    font-size: 0.92rem;
+}
+
+.tc-settings-page .tc-save-state[data-tone="success"] {
+    color: var(--tc-success);
+}
+
+.tc-settings-page .tc-save-state[data-tone="success"]::before {
+    content: "✓";
+    font-weight: 700;
+}
+
+.tc-settings-page .tc-save-state[data-tone="pending"] {
+    color: var(--tc-warning);
+}
+
+.tc-settings-page .tc-save-state[data-tone="pending"]::before {
+    content: "●";
+    font-size: 0.7em;
+}
+
+.tc-settings-page .tc-save-state[data-tone="error"] {
+    color: var(--tc-danger);
+}
+
+.tc-settings-page .tc-save-state[data-tone="error"]::before {
+    content: "!";
+    font-weight: 700;
+}
+
+.tc-settings-page .tc-save-button {
+    min-width: 11rem;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Responsive layout
+ * ------------------------------------------------------------------------ */
+
+@media (max-width: 40rem) {
+    .tc-settings-page .tc-nav {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .tc-settings-page .tc-nav-link {
+        flex: 1;
+        padding-inline: 0.5rem;
+        text-align: center;
+    }
+
+    .tc-settings-page .tc-section {
+        padding: 1rem;
+    }
+
+    .tc-settings-page .tc-field-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tc-settings-page .tc-save-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tc-settings-page .tc-save-button {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tc-settings-page *,
+    .tc-settings-page *::before,
+    .tc-settings-page *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

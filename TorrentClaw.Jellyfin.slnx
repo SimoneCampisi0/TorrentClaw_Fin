@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/Jellyfin.Plugin.TorrentClaw/Jellyfin.Plugin.TorrentClaw.csproj" />
+  <Project Path="tests/Jellyfin.Plugin.TorrentClaw.Tests/Jellyfin.Plugin.TorrentClaw.Tests.csproj" />
+</Solution>
+

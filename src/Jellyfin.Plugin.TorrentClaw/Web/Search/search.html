@@ -1,0 +1,229 @@
+<div id="tcSearchPage"
+     data-role="page"
+     class="page type-interior pluginConfigurationPage tc-page tc-search-page"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox"
+     data-controller="__plugin/TorrentClawSearch.js">
+    <link rel="stylesheet" href="configurationpage?name=TorrentClawSearch.css">
+
+    <div data-role="content">
+        <div class="content-primary tc-shell">
+
+            <header class="tc-header">
+                <div class="tc-header-text">
+                    <p class="tc-eyebrow">TorrentClaw</p>
+                    <h1 class="tc-title">Cerca release</h1>
+                    <p class="tc-lead">Cerca su TorrentClaw, confronta qualità, lingue e disponibilità, poi invia manualmente la release scelta a qBittorrent.</p>
+                </div>
+                <nav class="tc-nav" aria-label="Pagine TorrentClaw">
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch" aria-current="page">Cerca</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads">Download</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings">Impostazioni</a>
+                </nav>
+            </header>
+
+            <form id="tcSearchForm" class="tc-search-form" novalidate>
+                <fieldset class="tc-query-group">
+                    <legend class="tc-group-legend">Contenuto</legend>
+                    <div class="tc-query-row">
+                        <div class="inputContainer tc-field">
+                            <label class="inputLabel" for="tcQuery">Titolo</label>
+                            <input is="emby-input" id="tcQuery" type="search" required maxlength="200" autocomplete="off" aria-describedby="tcQueryError">
+                            <p id="tcQueryError" class="tc-field-error" hidden></p>
+                        </div>
+                        <div class="selectContainer tc-field">
+                            <label class="selectLabel" for="tcType">Tipo</label>
+                            <select is="emby-select" id="tcType">
+                                <option value="0">Film</option>
+                                <option value="1">Serie TV</option>
+                            </select>
+                        </div>
+                        <button is="emby-button" id="tcSearchButton" type="submit" class="raised button-submit tc-search-submit">
+                            <span>Cerca</span>
+                        </button>
+                    </div>
+                </fieldset>
+
+                <details id="tcFilters" class="tc-filters" open>
+                    <summary class="tc-filters-summary">
+                        <span>Filtri</span>
+                        <span id="tcFilterCount" class="tc-filter-count" hidden></span>
+                    </summary>
+
+                    <div class="tc-filter-groups">
+                        <fieldset class="tc-filter-group">
+                            <legend class="tc-group-legend">Video</legend>
+                            <div class="selectContainer tc-field">
+                                <label class="selectLabel" for="tcResolution">Risoluzione</label>
+                                <select is="emby-select" id="tcResolution">
+                                    <option value="">Qualsiasi</option>
+                                    <option value="720p">720p</option>
+                                    <option value="1080p">1080p</option>
+                                    <option value="2160p">2160p (4K)</option>
+                                </select>
+                            </div>
+                            <div class="selectContainer tc-field">
+                                <label class="selectLabel" for="tcCodec">Codec</label>
+                                <select is="emby-select" id="tcCodec">
+                                    <option value="">Qualsiasi</option>
+                                    <option value="AVC">H.264 / AVC</option>
+                                    <option value="HEVC">H.265 / HEVC</option>
+                                    <option value="AV1">AV1</option>
+                                </select>
+                            </div>
+                            <div class="selectContainer tc-field">
+                                <label class="selectLabel" for="tcHdr">HDR</label>
+                                <select is="emby-select" id="tcHdr">
+                                    <option value="">Qualsiasi</option>
+                                    <option value="SDR">SDR</option>
+                                    <option value="HDR10">HDR10</option>
+                                    <option value="HDR10+">HDR10+</option>
+                                    <option value="Dolby Vision">Dolby Vision</option>
+                                </select>
+                            </div>
+                            <div class="checkboxContainer tc-field">
+                                <label>
+                                    <input is="emby-checkbox" id="tcPreferRemux" type="checkbox">
+                                    <span>Preferisci REMUX</span>
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="tc-filter-group">
+                            <legend class="tc-group-legend">Audio e sottotitoli</legend>
+                            <div class="selectContainer tc-field">
+                                <label class="selectLabel" for="tcAudioLanguage">Lingua audio</label>
+                                <select is="emby-select" id="tcAudioLanguage">
+                                    <option value="">Qualsiasi</option>
+                                    <option value="it">Italiano</option>
+                                    <option value="en">Inglese</option>
+                                    <option value="it,en">Italiano + Inglese</option>
+                                    <option value="fr">Francese</option>
+                                    <option value="es">Spagnolo</option>
+                                    <option value="de">Tedesco</option>
+                                    <option value="ja">Giapponese</option>
+                                    <option value="pt">Portoghese</option>
+                                    <option value="ru">Russo</option>
+                                </select>
+                            </div>
+                            <div class="selectContainer tc-field">
+                                <label class="selectLabel" for="tcSubtitleLanguage">Sottotitoli</label>
+                                <select is="emby-select" id="tcSubtitleLanguage">
+                                    <option value="">Qualsiasi</option>
+                                    <option value="it">Italiano</option>
+                                    <option value="en">Inglese</option>
+                                    <option value="it,en">Italiano + Inglese</option>
+                                    <option value="none">Nessun sottotitolo</option>
+                                    <option value="fr">Francese</option>
+                                    <option value="es">Spagnolo</option>
+                                    <option value="de">Tedesco</option>
+                                    <option value="ja">Giapponese</option>
+                                    <option value="pt">Portoghese</option>
+                                    <option value="ru">Russo</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer tc-field">
+                                <label class="inputLabel" for="tcAudioFormat">Formato audio</label>
+                                <input is="emby-input" id="tcAudioFormat" type="text" maxlength="40" autocomplete="off" placeholder="Atmos, DTS, AAC…">
+                            </div>
+                            <p class="tc-hint">Audio e sottotitoli sono filtri distinti: con più lingue devono essere presenti tutte.</p>
+                        </fieldset>
+
+                        <fieldset class="tc-filter-group">
+                            <legend class="tc-group-legend">Disponibilità</legend>
+                            <div class="inputContainer tc-field">
+                                <label class="inputLabel" for="tcMaxSize">Dimensione massima (GB)</label>
+                                <input is="emby-input" id="tcMaxSize" type="number" min="0" step="0.1" inputmode="decimal" aria-describedby="tcMaxSizeError">
+                                <p id="tcMaxSizeError" class="tc-field-error" hidden></p>
+                            </div>
+                            <div class="inputContainer tc-field">
+                                <label class="inputLabel" for="tcMinSeeders">Seeders minimi</label>
+                                <input is="emby-input" id="tcMinSeeders" type="number" min="0" step="1" inputmode="numeric" aria-describedby="tcMinSeedersError">
+                                <p id="tcMinSeedersError" class="tc-field-error" hidden></p>
+                            </div>
+                            <div class="selectContainer tc-field">
+                                <label class="selectLabel" for="tcSort">Ordina per</label>
+                                <select is="emby-select" id="tcSort">
+                                    <option value="0">Compatibilità</option>
+                                    <option value="1">Qualità</option>
+                                    <option value="2">Seeders</option>
+                                    <option value="3">Dimensione</option>
+                                </select>
+                            </div>
+                            <div class="checkboxContainer tc-field">
+                                <label>
+                                    <input is="emby-checkbox" id="tcVerifiedOnly" type="checkbox">
+                                    <span>Solo release verificate TrueSpec</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                    </div>
+                </details>
+
+                <div class="tc-active-filters" aria-live="polite">
+                    <span class="tc-active-filters-label">Filtri attivi:</span>
+                    <ul id="tcActiveFilterList" class="tc-chip-list"></ul>
+                    <span id="tcNoActiveFilters" class="tc-active-filters-empty">nessuno</span>
+                </div>
+            </form>
+
+            <div id="tcSearchStatus" class="tc-status" role="status" aria-live="polite" hidden></div>
+
+            <section class="tc-results" aria-labelledby="tcResultsTitle">
+                <div id="tcResultsHeader" class="tc-results-header" hidden>
+                    <h2 id="tcResultsTitle" class="tc-section-title">Risultati</h2>
+                    <p id="tcResultsCount" class="tc-results-count"></p>
+                </div>
+
+                <div id="tcSkeletonList" class="tc-result-list" aria-hidden="true" hidden>
+                    <div class="tc-release tc-release-skeleton">
+                        <div class="tc-poster tc-skeleton-block"></div>
+                        <div class="tc-release-body">
+                            <div class="tc-skeleton-line tc-skeleton-title"></div>
+                            <div class="tc-skeleton-line tc-skeleton-medium"></div>
+                            <div class="tc-skeleton-line tc-skeleton-short"></div>
+                            <div class="tc-skeleton-line tc-skeleton-medium"></div>
+                        </div>
+                    </div>
+                    <div class="tc-release tc-release-skeleton">
+                        <div class="tc-poster tc-skeleton-block"></div>
+                        <div class="tc-release-body">
+                            <div class="tc-skeleton-line tc-skeleton-title"></div>
+                            <div class="tc-skeleton-line tc-skeleton-medium"></div>
+                            <div class="tc-skeleton-line tc-skeleton-short"></div>
+                            <div class="tc-skeleton-line tc-skeleton-medium"></div>
+                        </div>
+                    </div>
+                    <div class="tc-release tc-release-skeleton">
+                        <div class="tc-poster tc-skeleton-block"></div>
+                        <div class="tc-release-body">
+                            <div class="tc-skeleton-line tc-skeleton-title"></div>
+                            <div class="tc-skeleton-line tc-skeleton-medium"></div>
+                            <div class="tc-skeleton-line tc-skeleton-short"></div>
+                            <div class="tc-skeleton-line tc-skeleton-medium"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tcResultList" class="tc-result-list"></div>
+
+                <div id="tcIntroState" class="tc-empty">
+                    <svg class="tc-empty-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                        <path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <p class="tc-empty-title">Pronto per la ricerca</p>
+                    <p class="tc-empty-text">Inserisci un titolo: i filtri predefiniti arrivano dalle Impostazioni. Nessun download parte senza il tuo clic.</p>
+                </div>
+
+                <div id="tcEmptyState" class="tc-empty" hidden>
+                    <svg class="tc-empty-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                        <path d="M15.5 15.5 21 21M8 8.5l5 4M13 8.5l-5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <p class="tc-empty-title">Nessuna release trovata</p>
+                    <p class="tc-empty-text">Prova a controllare il titolo, a scegliere il tipo corretto oppure a rimuovere alcuni filtri attivi.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>

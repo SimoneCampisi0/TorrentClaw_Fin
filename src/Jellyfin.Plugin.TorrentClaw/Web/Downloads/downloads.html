@@ -1,0 +1,72 @@
+<div id="tcDownloadsPage"
+     data-role="page"
+     class="page type-interior pluginConfigurationPage tc-page tc-downloads-page"
+     data-require="emby-button"
+     data-controller="__plugin/TorrentClawDownloads.js">
+    <link rel="stylesheet" href="configurationpage?name=TorrentClawDownloads.css">
+
+    <div data-role="content">
+        <div class="content-primary tc-shell">
+
+            <header class="tc-header">
+                <div class="tc-header-text">
+                    <p class="tc-eyebrow">TorrentClaw</p>
+                    <h1 class="tc-title">Download</h1>
+                    <p class="tc-lead">Stato dei torrent inviati a qBittorrent da questo plugin. Al completamento viene richiesto l'aggiornamento della libreria Jellyfin.</p>
+                </div>
+                <nav class="tc-nav" aria-label="Pagine TorrentClaw">
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch">Cerca</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads" aria-current="page">Download</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings">Impostazioni</a>
+                </nav>
+            </header>
+
+            <aside class="tc-notice" role="note">
+                <svg class="tc-notice-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+                <div>
+                    <p class="tc-notice-title">Monitoraggio in memoria</p>
+                    <p class="tc-notice-text">L'elenco contiene solo i download avviati da questo plugin dall'ultimo avvio di Jellyfin. Dopo un riavvio i torrent restano in qBittorrent ma non compaiono più qui. La rimozione non cancella mai i file scaricati.</p>
+                </div>
+            </aside>
+
+            <div class="tc-toolbar">
+                <div class="tc-toolbar-text">
+                    <p id="tcDownloadSummary" class="tc-toolbar-summary">Caricamento dei download…</p>
+                    <p id="tcLastUpdated" class="tc-toolbar-meta">Aggiornamento automatico ogni 10 secondi mentre la pagina è visibile.</p>
+                </div>
+                <button is="emby-button" id="tcRefreshButton" type="button" class="raised tc-refresh-button">
+                    <span>Aggiorna</span>
+                </button>
+            </div>
+
+            <div id="tcDownloadStatus" class="tc-status" role="status" aria-live="polite" hidden></div>
+
+            <div id="tcLoadingState" class="tc-download-list" aria-hidden="true">
+                <div class="tc-download tc-download-skeleton">
+                    <div class="tc-skeleton-line tc-skeleton-title"></div>
+                    <div class="tc-skeleton-line tc-skeleton-bar"></div>
+                    <div class="tc-skeleton-line tc-skeleton-short"></div>
+                </div>
+                <div class="tc-download tc-download-skeleton">
+                    <div class="tc-skeleton-line tc-skeleton-title"></div>
+                    <div class="tc-skeleton-line tc-skeleton-bar"></div>
+                    <div class="tc-skeleton-line tc-skeleton-short"></div>
+                </div>
+            </div>
+
+            <div id="tcDownloadList" class="tc-download-list"></div>
+
+            <div id="tcEmptyState" class="tc-empty" hidden>
+                <svg class="tc-empty-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <p class="tc-empty-title">Nessun download monitorato</p>
+                <p class="tc-empty-text">Scegli una release dalla pagina di ricerca e premi Download: comparirà qui con avanzamento, velocità e tempo stimato.</p>
+                <a class="tc-empty-link" href="#/configurationpage?name=TorrentClawSearch">Vai alla ricerca</a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,14 @@
+name: "TorrentClaw"
+guid: "7619f4e6-29bc-41e1-9232-d4eb06f1962c"
+version: "12.0.0.4"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+owner: "TorrentClaw Jellyfin Plugin Contributors"
+overview: "Search TorrentClaw, select releases, and monitor qBittorrent downloads."
+description: "A deterministic, LLM-free TorrentClaw workflow for Jellyfin 12."
+category: "General"
+artifacts:
+  - "Jellyfin.Plugin.TorrentClaw.dll"
+changelog: |-
+  12.0.0.4: separate Search, Downloads and Configuration APIs; three independent pages with external CSS/JS;
+  TorrentClaw posters through a validated server-side proxy; redesigned result cards with flags for audio and subtitles.

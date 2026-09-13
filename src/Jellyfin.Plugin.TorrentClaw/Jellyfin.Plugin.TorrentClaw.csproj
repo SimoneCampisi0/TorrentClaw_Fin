@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Jellyfin.Plugin.TorrentClaw</AssemblyName>
+    <RootNamespace>Jellyfin.Plugin.TorrentClaw</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Version>12.0.0.4</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Jellyfin.Controller" Version="12.0.0">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model" Version="12.0.0">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Web\Search\search.html" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Search.search.html" />
+    <EmbeddedResource Include="Web\Search\search.css" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Search.search.css" />
+    <EmbeddedResource Include="Web\Search\search.js" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Search.search.js" />
+    <EmbeddedResource Include="Web\Downloads\downloads.html" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Downloads.downloads.html" />
+    <EmbeddedResource Include="Web\Downloads\downloads.css" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Downloads.downloads.css" />
+    <EmbeddedResource Include="Web\Downloads\downloads.js" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Downloads.downloads.js" />
+    <EmbeddedResource Include="Web\Settings\settings.html" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.html" />
+    <EmbeddedResource Include="Web\Settings\settings.css" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.css" />
+    <EmbeddedResource Include="Web\Settings\settings.js" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.js" />
+  </ItemGroup>
+</Project>
