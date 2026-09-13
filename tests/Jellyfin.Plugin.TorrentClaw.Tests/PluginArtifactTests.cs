@@ -8,7 +8,8 @@ namespace Jellyfin.Plugin.TorrentClaw.Tests;
 
 public sealed class PluginArtifactTests
 {
-    private const string ExpectedVersion = "12.0.0.4";
+    private const string ExpectedVersion = "0.1.0";
+    private const string ExpectedAssemblyVersion = "0.1.0.0";
     private static readonly string[] PageNames = [Plugin.SearchPageName, Plugin.DownloadsPageName, Plugin.SettingsPageName];
     private static readonly string[] ScriptSections =
     [
@@ -193,7 +194,7 @@ public sealed class PluginArtifactTests
     {
         var root = RepositoryPaths.Root;
 
-        Assert.Equal(new Version(ExpectedVersion), typeof(Plugin).Assembly.GetName().Version);
+        Assert.Equal(new Version(ExpectedAssemblyVersion), typeof(Plugin).Assembly.GetName().Version);
         Assert.EndsWith("/" + ExpectedVersion, PluginServiceRegistrator.UserAgent, StringComparison.Ordinal);
         Assert.Contains($"version: \"{ExpectedVersion}\"", File.ReadAllText(Path.Combine(root, "build.yaml")), StringComparison.Ordinal);
         Assert.Contains(ExpectedVersion, File.ReadAllText(Path.Combine(root, "README.md")), StringComparison.Ordinal);

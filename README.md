@@ -35,7 +35,22 @@ For development and packaging:
 - .NET SDK 10.0.401 or a compatible .NET 10 SDK.
 - Node.js 20 or later is optional and is used by the browser-script tests when available.
 
-## Build
+## Install from GitHub Releases
+
+The recommended installation path is the prebuilt release asset. No local build is required.
+
+1. Download [TorrentClaw_Fin_0.1.0.zip](https://github.com/SimoneCampisi0/TorrentClaw_Fin/releases/latest/download/TorrentClaw_Fin_0.1.0.zip) from the [latest GitHub Release](https://github.com/SimoneCampisi0/TorrentClaw_Fin/releases/latest).
+2. Stop Jellyfin before replacing a plugin DLL.
+3. Create a versioned plugin folder, for example:
+
+       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_Fin_0.1.0
+
+4. Extract the ZIP into that folder.
+5. Start Jellyfin, sign in as an administrator, and configure the plugin through Server Dashboard.
+
+The GitHub Release also includes a SHA-256 checksum file. Verify it before installing when your deployment process requires artifact integrity checks.
+
+## Build from source (optional)
 
 From the repository root:
 
@@ -43,15 +58,15 @@ From the repository root:
     dotnet test TorrentClaw.Jellyfin.slnx -c Release
     powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1
 
-The packaging script checks the version against build.yaml and creates a versioned ZIP plus a SHA-256 checksum in artifacts.
+The packaging script checks the version against build.yaml and creates TorrentClaw_Fin_0.1.0.zip plus its SHA-256 checksum in artifacts.
 
-## Install in Jellyfin
+## Manual installation details
 
-1. Build or download the release ZIP.
+1. Obtain TorrentClaw_Fin_0.1.0.zip from GitHub Releases or build it locally.
 2. Stop Jellyfin before replacing a plugin DLL.
 3. Create a versioned plugin folder in Jellyfin's plugins directory, for example:
 
-       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_<version>
+       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_Fin_0.1.0
 
 4. Extract the release ZIP into that folder.
 5. Start Jellyfin and sign in with an administrator account.

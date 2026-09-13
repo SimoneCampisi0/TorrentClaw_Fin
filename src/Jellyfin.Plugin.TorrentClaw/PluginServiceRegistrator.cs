@@ -11,7 +11,7 @@ namespace Jellyfin.Plugin.TorrentClaw;
 
 public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
 {
-    public const string UserAgent = "Jellyfin.Plugin.TorrentClaw/12.0.0.4";
+    public const string UserAgent = "Jellyfin.Plugin.TorrentClaw/0.1.0";
 
     public void RegisterServices(
         IServiceCollection serviceCollection,

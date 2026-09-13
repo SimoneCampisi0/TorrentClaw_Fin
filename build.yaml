@@ -1,6 +1,6 @@
 name: "TorrentClaw"
 guid: "7619f4e6-29bc-41e1-9232-d4eb06f1962c"
-version: "12.0.0.4"
+version: "0.1.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "TorrentClaw Jellyfin Plugin Contributors"
@@ -10,5 +10,5 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.TorrentClaw.dll"
 changelog: |-
-  12.0.0.4: separate Search, Downloads and Configuration APIs; three independent pages with external CSS/JS;
-  TorrentClaw posters through a validated server-side proxy; redesigned result cards with flags for audio and subtitles.
+  0.1.0: first public GitHub release of TorrentClaw_Fin, with separate Search, Downloads, and Settings pages;
+  TorrentClaw posters through a validated server-side proxy and result cards with audio and subtitle flags.

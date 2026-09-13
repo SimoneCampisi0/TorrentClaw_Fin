@@ -21,8 +21,8 @@ if ($manifestText -notmatch ('(?m)^version:\s*"' + [regex]::Escape($version) + '
 
 $buildOutput = Join-Path $repositoryRoot "src\Jellyfin.Plugin.TorrentClaw\bin\$Configuration\net10.0"
 $artifacts = Join-Path $repositoryRoot "artifacts"
-$stage = Join-Path $artifacts "TorrentClaw_$version"
-$archive = Join-Path $artifacts "Jellyfin.Plugin.TorrentClaw_$version.zip"
+$stage = Join-Path $artifacts "TorrentClaw_Fin_$version"
+$archive = Join-Path $artifacts "TorrentClaw_Fin_$version.zip"
 $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repositoryRoot).TrimEnd('\') + '\'
 $resolvedStage = [System.IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'
 

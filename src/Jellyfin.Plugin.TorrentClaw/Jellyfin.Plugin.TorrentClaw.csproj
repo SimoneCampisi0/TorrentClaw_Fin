@@ -4,7 +4,7 @@
     <AssemblyName>Jellyfin.Plugin.TorrentClaw</AssemblyName>
     <RootNamespace>Jellyfin.Plugin.TorrentClaw</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>12.0.0.4</Version>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
