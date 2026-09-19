@@ -124,6 +124,21 @@ public sealed class QbittorrentClientTests
         Assert.Contains(magnet, handler.Requests[1].Body, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task MetadataPreflightStopsWhenMetainfoIsAvailable()
+    {
+        var handler = new QueueHttpHandler();
+        EnqueueLogin(handler);
+        handler.Enqueue(HttpStatusCode.OK, string.Empty, "text/plain");
+        var magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+
+        await CreateClient(handler).AddMetadataPreflightAsync(magnet, "movies", "C:\\Movies", CancellationToken.None);
+
+        Assert.Equal("/api/v2/torrents/add", handler.Requests[1].Uri.AbsolutePath);
+        Assert.Contains("name=stop_condition", handler.Requests[1].Body, StringComparison.Ordinal);
+        Assert.Contains("MetadataReceived", handler.Requests[1].Body, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(true, "/api/v2/torrents/stop")]
     [InlineData(false, "/api/v2/torrents/start")]

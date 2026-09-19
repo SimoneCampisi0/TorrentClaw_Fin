@@ -10,6 +10,12 @@ public interface IDownloadService
 {
     Task<DownloadItem> StartAsync(string releaseId, CancellationToken cancellationToken);
 
+    Task<DownloadPreflightResult> PreflightAsync(string releaseId, CancellationToken cancellationToken);
+
+    Task<DownloadItem> ConfirmPreflightAsync(string releaseId, CancellationToken cancellationToken);
+
+    Task CancelPreflightAsync(string releaseId, CancellationToken cancellationToken);
+
     IReadOnlyList<DownloadItem> GetDownloads();
 
     Task PauseAsync(Guid id, CancellationToken cancellationToken);
@@ -37,6 +43,7 @@ public sealed class DownloadService : IDownloadService
     private readonly IJellyfinLibraryService _libraryService;
     private readonly ILogger<DownloadService> _logger;
     private readonly ConcurrentDictionary<Guid, DownloadItem> _downloads = new();
+    private readonly ConcurrentDictionary<string, Task<PendingPreflight>> _preflights = new(StringComparer.Ordinal);
 
     public DownloadService(
         ISearchService searchService,
@@ -75,17 +82,76 @@ public sealed class DownloadService : IDownloadService
             settings.Category,
             savePath,
             cancellationToken).ConfigureAwait(false);
-        var item = new DownloadItem
+        return RegisterDownload(release);
+    }
+
+    public async Task<DownloadPreflightResult> PreflightAsync(string releaseId, CancellationToken cancellationToken)
+    {
+        var task = _preflights.GetOrAdd(
+            releaseId,
+            key => CreatePreflightAsync(key, cancellationToken));
+        PendingPreflight preflight;
+        try
         {
-            Id = Guid.NewGuid(),
-            Hash = NormalizeInfoHash(release.InfoHash),
-            ReleaseName = release.ReleaseName,
-            ContentType = release.ContentType,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        _downloads[item.Id] = item;
-        LogAdded(_logger, item.ReleaseName, null);
-        return item;
+            preflight = await task.ConfigureAwait(false);
+        }
+        catch
+        {
+            _preflights.TryRemove(new KeyValuePair<string, Task<PendingPreflight>>(releaseId, task));
+            throw;
+        }
+
+        if (preflight.Status != DownloadPreflightStatus.Ready)
+        {
+            _preflights.TryRemove(new KeyValuePair<string, Task<PendingPreflight>>(releaseId, task));
+        }
+
+        return preflight.ToResult();
+    }
+
+    public async Task<DownloadItem> ConfirmPreflightAsync(string releaseId, CancellationToken cancellationToken)
+    {
+        if (!_preflights.TryRemove(releaseId, out var task))
+        {
+            throw new InvalidOperationException("The torrent verification has expired. Verify the release again.");
+        }
+
+        var preflight = await task.ConfigureAwait(false);
+        if (preflight.Status != DownloadPreflightStatus.Ready)
+        {
+            throw new InvalidOperationException(preflight.Message);
+        }
+
+        try
+        {
+            await _qbittorrent.ResumeAsync(preflight.Release.InfoHash, cancellationToken).ConfigureAwait(false);
+            return RegisterDownload(preflight.Release);
+        }
+        catch
+        {
+            _preflights.TryAdd(releaseId, Task.FromResult(preflight));
+            throw;
+        }
+    }
+
+    public async Task CancelPreflightAsync(string releaseId, CancellationToken cancellationToken)
+    {
+        if (!_preflights.TryRemove(releaseId, out var task))
+        {
+            return;
+        }
+
+        var preflight = await task.ConfigureAwait(false);
+        try
+        {
+            await _qbittorrent.DeleteTorrentAsync(preflight.Release.InfoHash, false, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            _preflights.TryAdd(releaseId, Task.FromResult(preflight));
+            throw;
+        }
     }
 
     public IReadOnlyList<DownloadItem> GetDownloads() =>
@@ -135,6 +201,113 @@ public sealed class DownloadService : IDownloadService
                 LogStatusFailure(_logger, HashPrefix(item.Hash), ex);
             }
         }
+    }
+
+    private async Task<PendingPreflight> CreatePreflightAsync(string releaseId, CancellationToken cancellationToken)
+    {
+        if (!_searchService.TryResolveRelease(releaseId, out var release) || release is null)
+        {
+            throw new KeyNotFoundException("Release expired or was not produced by the latest search.");
+        }
+
+        var settings = _configuration.GetQbittorrentSettings();
+        var savePath = release.ContentType == ContentKind.Movie
+            ? settings.MovieSavePath
+            : settings.TvSavePath;
+        if (string.IsNullOrWhiteSpace(savePath))
+        {
+            throw new InvalidOperationException("The save path for this media type is not configured.");
+        }
+
+        EnsureDownloadWillNotOverwrite(savePath, release.ReleaseName);
+        var added = false;
+        try
+        {
+            await _qbittorrent.AddMetadataPreflightAsync(
+                release.MagnetUrl,
+                settings.Category,
+                savePath,
+                cancellationToken).ConfigureAwait(false);
+            added = true;
+
+            var status = await WaitForMetadataAsync(release.InfoHash, settings.TimeoutSeconds, cancellationToken)
+                .ConfigureAwait(false);
+            if (status is null)
+            {
+                await DeletePreflightTorrentAsync(release.InfoHash, CancellationToken.None).ConfigureAwait(false);
+                added = false;
+                return PendingPreflight.MetadataUnavailable(release, releaseId);
+            }
+
+            var maximumSizeBytes = release.MaximumSizeGb > 0
+                ? checked((long)(release.MaximumSizeGb.Value * 1024 * 1024 * 1024))
+                : (long?)null;
+            if (maximumSizeBytes is not null && status.TotalBytes > maximumSizeBytes)
+            {
+                await DeletePreflightTorrentAsync(release.InfoHash, CancellationToken.None).ConfigureAwait(false);
+                added = false;
+                return PendingPreflight.MaximumSizeExceeded(release, releaseId, status.TotalBytes, maximumSizeBytes.Value);
+            }
+
+            return PendingPreflight.Ready(release, releaseId, status.TotalBytes, maximumSizeBytes);
+        }
+        catch
+        {
+            if (added)
+            {
+                await DeletePreflightTorrentAsync(release.InfoHash, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task<TorrentStatus?> WaitForMetadataAsync(
+        string hash,
+        int timeoutSeconds,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(timeoutSeconds);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var status = await _qbittorrent.GetTorrentStatusAsync(hash, cancellationToken).ConfigureAwait(false);
+            if (status?.TotalBytes > 0)
+            {
+                return status;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+        }
+
+        return null;
+    }
+
+    private async Task DeletePreflightTorrentAsync(string hash, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _qbittorrent.DeleteTorrentAsync(hash, false, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            LogStatusFailure(_logger, HashPrefix(hash), ex);
+        }
+    }
+
+    private DownloadItem RegisterDownload(SelectedRelease release)
+    {
+        var item = new DownloadItem
+        {
+            Id = Guid.NewGuid(),
+            Hash = NormalizeInfoHash(release.InfoHash),
+            ReleaseName = release.ReleaseName,
+            ContentType = release.ContentType,
+            CreatedAt = DateTimeOffset.UtcNow,
+            SourceSizeBytes = release.SourceSizeBytes
+        };
+        _downloads[item.Id] = item;
+        LogAdded(_logger, item.ReleaseName, null);
+        return item;
     }
 
     private string ValidateCompletedPath(DownloadItem item, TorrentStatus status)
@@ -199,4 +372,55 @@ public sealed class DownloadService : IDownloadService
     }
 
     private static string HashPrefix(string hash) => hash.Length <= 8 ? hash : hash[..8];
+
+    private sealed record PendingPreflight(
+        SelectedRelease Release,
+        string ReleaseId,
+        long? ActualSizeBytes,
+        long? MaximumSizeBytes,
+        DownloadPreflightStatus Status,
+        string Message)
+    {
+        public static PendingPreflight Ready(
+            SelectedRelease release,
+            string releaseId,
+            long actualSizeBytes,
+            long? maximumSizeBytes) => new(
+                release,
+                releaseId,
+                actualSizeBytes,
+                maximumSizeBytes,
+                DownloadPreflightStatus.Ready,
+                "Torrent metadata verified. Confirm to start the download.");
+
+        public static PendingPreflight MaximumSizeExceeded(
+            SelectedRelease release,
+            string releaseId,
+            long actualSizeBytes,
+            long maximumSizeBytes) => new(
+                release,
+                releaseId,
+                actualSizeBytes,
+                maximumSizeBytes,
+                DownloadPreflightStatus.MaximumSizeExceeded,
+                "The verified torrent size exceeds the configured maximum size.");
+
+        public static PendingPreflight MetadataUnavailable(SelectedRelease release, string releaseId) => new(
+            release,
+            releaseId,
+            null,
+            null,
+            DownloadPreflightStatus.MetadataUnavailable,
+            "Torrent metadata could not be obtained before the timeout.");
+
+        public DownloadPreflightResult ToResult() => new(
+            ReleaseId,
+            Release.ReleaseName,
+            Release.ContentType,
+            Release.SourceSizeBytes,
+            ActualSizeBytes,
+            MaximumSizeBytes,
+            Status,
+            Message);
+    }
 }

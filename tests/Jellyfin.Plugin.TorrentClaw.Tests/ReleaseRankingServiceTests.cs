@@ -23,7 +23,8 @@ public sealed class ReleaseRankingServiceTests
 
         Assert.False(result.Eligible);
         Assert.Contains("requested audio language", result.ConstraintsViolated);
-        Assert.Contains("maximum size", result.ConstraintsViolated);
+        Assert.DoesNotContain("maximum size", result.ConstraintsViolated);
+        Assert.Contains("Source-reported size exceeds the limit; verify before download", result.Warnings);
         Assert.Contains("minimum seeders", result.ConstraintsViolated);
     }
 
@@ -68,7 +69,7 @@ public sealed class ReleaseRankingServiceTests
         Assert.Equal(expected, ReleaseRankingService.NormalizeHdr(input));
 
     [Fact]
-    public void MissingSizeMetadataFailsSizeHardConstraint()
+    public void MissingSizeMetadataIsDeferredToPreflight()
     {
         var result = _service.Rank(
             "id",
@@ -77,8 +78,8 @@ public sealed class ReleaseRankingServiceTests
             CreateTorrent() with { SizeBytes = null },
             new ReleaseSearchRequest { Query = "Title", MaxSizeGb = 30 });
 
-        Assert.False(result.Eligible);
-        Assert.Contains("Size metadata unavailable", result.Warnings);
+        Assert.True(result.Eligible);
+        Assert.Contains("Size must be verified from torrent metadata", result.Warnings);
     }
 
     [Fact]

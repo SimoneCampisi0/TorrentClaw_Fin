@@ -343,16 +343,15 @@ public sealed class ReleaseRankingService : IReleaseRankingService
 
         if (torrent.SizeBytes is null)
         {
-            violated.Add("maximum size (metadata unavailable)");
-            warnings.Add("Size metadata unavailable");
+            warnings.Add("Size must be verified from torrent metadata");
         }
         else if (torrent.SizeBytes <= request.MaxSizeGb * 1024 * 1024 * 1024)
         {
-            satisfied.Add("maximum size");
+            warnings.Add("Size limit will be verified before download");
         }
         else
         {
-            violated.Add("maximum size");
+            warnings.Add("Source-reported size exceeds the limit; verify before download");
         }
     }
 

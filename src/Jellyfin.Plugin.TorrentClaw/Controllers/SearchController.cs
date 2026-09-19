@@ -64,4 +64,23 @@ public sealed class SearchController : ControllerBase
         Response.Headers.XContentTypeOptions = "nosniff";
         return File(poster.Content, poster.ContentType);
     }
+
+    /// <summary>
+    /// Returns a magnet only after an administrator explicitly requests the clipboard action for a cached release.
+    /// It is deliberately separate from the search payload so release listings never contain magnets.
+    /// </summary>
+    [HttpGet("{releaseId}/Magnet")]
+    [ProducesResponseType<ReleaseMagnetResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<ReleaseMagnetResponse> GetMagnet(string releaseId)
+    {
+        if (!ReleaseIdentifier.IsValid(releaseId)
+            || !_searchService.TryResolveRelease(releaseId, out var release)
+            || release is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new ReleaseMagnetResponse(release.MagnetUrl));
+    }
 }

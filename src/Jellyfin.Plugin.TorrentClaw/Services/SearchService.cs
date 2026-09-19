@@ -17,7 +17,9 @@ public sealed record SelectedRelease(
     string MagnetUrl,
     string InfoHash,
     string ReleaseName,
-    ContentKind ContentType);
+    ContentKind ContentType,
+    long? SourceSizeBytes,
+    double? MaximumSizeGb);
 
 public sealed class SearchService : ISearchService
 {
@@ -51,7 +53,9 @@ public sealed class SearchService : ISearchService
                             torrent.MagnetUrl,
                             torrent.InfoHash,
                             torrent.RawTitle,
-                            request.Type),
+                            request.Type,
+                            torrent.SizeBytes,
+                            request.MaxSizeGb),
                         DateTimeOffset.UtcNow.AddMinutes(20));
                 }
 

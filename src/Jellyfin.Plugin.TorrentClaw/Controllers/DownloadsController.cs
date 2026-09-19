@@ -37,6 +37,44 @@ public sealed class DownloadsController : ControllerBase
         return Ok(item);
     }
 
+    /// <summary>Obtains the torrent metainfo and its exact size before a user confirms payload download.</summary>
+    [HttpPost("Preflight")]
+    [ProducesResponseType<DownloadPreflightResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status504GatewayTimeout)]
+    public async Task<ActionResult<DownloadPreflightResult>> Preflight(
+        [FromBody] StartDownloadRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await _downloadService.PreflightAsync(request.ReleaseId, cancellationToken).ConfigureAwait(false);
+        return Ok(result);
+    }
+
+    /// <summary>Starts a previously verified preflight torrent after the administrator confirms it.</summary>
+    [HttpPost("Preflight/{releaseId}/Confirm")]
+    [ProducesResponseType<DownloadItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<DownloadItem>> ConfirmPreflight(string releaseId, CancellationToken cancellationToken)
+    {
+        var item = await _downloadService.ConfirmPreflightAsync(releaseId, cancellationToken).ConfigureAwait(false);
+        return Ok(item);
+    }
+
+    /// <summary>Cancels a preflight torrent without asking qBittorrent to delete any content files.</summary>
+    [HttpDelete("Preflight/{releaseId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult> CancelPreflight(string releaseId, CancellationToken cancellationToken)
+    {
+        await _downloadService.CancelPreflightAsync(releaseId, cancellationToken).ConfigureAwait(false);
+        return NoContent();
+    }
+
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<DownloadItem>>(StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<DownloadItem>> GetDownloads() =>

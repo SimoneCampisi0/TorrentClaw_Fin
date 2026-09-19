@@ -12,8 +12,11 @@
 const ENDPOINTS = Object.freeze({
     configuration: 'TorrentClaw/Configuration',
     search: 'TorrentClaw/Search',
-    downloads: 'TorrentClaw/Downloads',
-    posterTemplate: 'TorrentClaw/Search/{releaseId}/Poster'
+    posterTemplate: 'TorrentClaw/Search/{releaseId}/Poster',
+    magnetTemplate: 'TorrentClaw/Search/{releaseId}/Magnet',
+    preflight: 'TorrentClaw/Downloads/Preflight',
+    preflightConfirmTemplate: 'TorrentClaw/Downloads/Preflight/{releaseId}/Confirm',
+    preflightTemplate: 'TorrentClaw/Downloads/Preflight/{releaseId}'
 });
 
 const DOWNLOADS_PAGE_URL = '#/configurationpage?name=TorrentClawDownloads';
@@ -107,8 +110,9 @@ const RULE_LABELS = Object.freeze({
     'no subtitles': 'nessun sottotitolo',
     'no subtitles (TrueSpec)': 'nessun sottotitolo (TrueSpec)',
     'no subtitles (metadata unavailable)': 'nessun sottotitolo (dato assente)',
-    'maximum size': 'dimensione massima',
-    'maximum size (metadata unavailable)': 'dimensione massima (dato assente)',
+    'Size must be verified from torrent metadata': 'dimensione da verificare dal torrent',
+    'Size limit will be verified before download': 'limite dimensione da verificare prima del download',
+    'Source-reported size exceeds the limit; verify before download': 'dimensione della fonte oltre limite: verifica prima del download',
     'minimum seeders': 'seeders minimi',
     'magnet unavailable': 'magnet non disponibile',
     resolution: 'risoluzione',
@@ -513,8 +517,28 @@ function searchReleases(searchRequest) {
     return requestJson(ENDPOINTS.search, { method: 'POST', body: searchRequest });
 }
 
-function startDownload(releaseId) {
-    return requestJson(ENDPOINTS.downloads, { method: 'POST', body: { ReleaseId: releaseId } });
+function startPreflight(releaseId) {
+    return requestJson(ENDPOINTS.preflight, { method: 'POST', body: { ReleaseId: releaseId } });
+}
+
+function confirmPreflight(releaseId) {
+    const path = ENDPOINTS.preflightConfirmTemplate.replace('{releaseId}', encodeURIComponent(releaseId));
+    return requestJson(path, { method: 'POST' });
+}
+
+async function cancelPreflight(releaseId) {
+    const apiClient = getApiClient();
+    const path = ENDPOINTS.preflightTemplate.replace('{releaseId}', encodeURIComponent(releaseId));
+    try {
+        await apiClient.ajax({ type: 'DELETE', url: apiClient.getUrl(path) });
+    } catch (failure) {
+        throw await toRequestError(failure);
+    }
+}
+
+function fetchReleaseMagnet(releaseId) {
+    const path = ENDPOINTS.magnetTemplate.replace('{releaseId}', encodeURIComponent(releaseId));
+    return requestJson(path);
 }
 
 async function fetchPosterBlob(releaseId) {
@@ -584,7 +608,9 @@ function createPageState() {
         posterObserver: null,
         posterQueue: [],
         activePosterRequests: 0,
-        posterObjectUrls: new Set()
+        posterObjectUrls: new Set(),
+        releaseRefs: new Map(),
+        activePreflight: null
     };
 }
 
@@ -688,6 +714,7 @@ function setSearchBusy(page, isBusy) {
 function clearResults(page) {
     const { elements } = page;
     resetPosterLoading(page);
+    page.state.releaseRefs.clear();
     elements.resultList.replaceChildren();
     elements.resultsHeader.hidden = true;
     elements.emptyState.hidden = true;
@@ -762,16 +789,23 @@ function createReleaseCard(page, release) {
     });
 
     const body = createElement('div', { className: 'tc-release-body' });
+    const stats = createStatsList(release);
+    const footer = createReleaseFooter(page, release);
     body.append(
         createReleaseHeading(release, headingId),
         createBadgeList(release),
         createTrackSummary(page, release),
-        createStatsList(release),
+        stats.list,
         createDetailsPanel(release),
-        createReleaseFooter(page, release)
+        footer.root
     );
 
-    card.append(createPosterFrame(release), body);
+    page.state.releaseRefs.set(release.ReleaseId, {
+        actualSize: stats.actualSize,
+        downloadButton: footer.button,
+        feedback: footer.feedback
+    });
+    card.append(createPosterFrame(release), body, createCopyMagnetButton(page, release));
     return card;
 }
 
@@ -1010,20 +1044,28 @@ function appendFlagStripes(flag, colors, direction) {
 
 function createStatsList(release) {
     const stats = [
-        ['Dimensione', formatBytes(release.SizeBytes)],
+        ['Dimensione dichiarata dalla fonte', formatBytes(release.SizeBytes)],
+        ['Dimensione (effettiva torrent)', '—'],
         ['Seeders', formatCount(release.Seeders)],
         ['Leechers', formatCount(release.Leechers)],
         ['Punteggio', formatCount(release.CompatibilityScore)]
     ];
 
     const list = createElement('dl', { className: 'tc-stats' });
+    let actualSize = null;
     for (const [label, value] of stats) {
         const stat = createElement('div', { className: 'tc-stat' });
-        stat.append(createElement('dt', { text: label }), createElement('dd', { text: value }));
+        const displayedValue = createElement('dd', { text: value });
+        if (label === 'Dimensione (effettiva torrent)') {
+            displayedValue.classList.add('tc-actual-size');
+            actualSize = displayedValue;
+        }
+
+        stat.append(createElement('dt', { text: label }), displayedValue);
         list.append(stat);
     }
 
-    return list;
+    return { list, actualSize };
 }
 
 function createDetailsPanel(release) {
@@ -1096,10 +1138,24 @@ function createReleaseFooter(page, release) {
         attributes: { type: 'button', 'aria-describedby': feedbackId }
     });
     button.disabled = !release.Eligible;
-    button.addEventListener('click', () => handleDownloadClick(page, release, button, feedback));
+    button.addEventListener('click', () => openPreflightModal(page, release, button, feedback));
 
     footer.append(feedback, button);
-    return footer;
+    return { root: footer, button, feedback };
+}
+
+function createCopyMagnetButton(page, release) {
+    const button = createElement('button', {
+        className: 'tc-copy-magnet-button',
+        text: '⧉',
+        attributes: {
+            type: 'button',
+            'aria-label': `Copia magnet di ${release.ReleaseName}`,
+            title: 'Copia magnet'
+        }
+    });
+    button.addEventListener('click', () => handleCopyMagnet(page, release, button));
+    return button;
 }
 
 function renderDownloadSent(feedback) {
@@ -1239,24 +1295,265 @@ async function handleSearchSubmit(page, event) {
     }
 }
 
-async function handleDownloadClick(page, release, button, feedback) {
+async function handleCopyMagnet(page, release, button) {
+    const originalText = button.textContent;
     button.disabled = true;
-    button.textContent = 'Invio…';
+    button.textContent = '…';
+    try {
+        const result = await fetchReleaseMagnet(release.ReleaseId);
+        const url = typeof result?.Url === 'string' ? result.Url : '';
+        if (url === '') {
+            throw new RequestError('Il magnet della release non è disponibile.', 404);
+        }
+
+        await copyToClipboard(url);
+        button.textContent = '✓';
+        button.setAttribute('aria-label', `Magnet copiato per ${release.ReleaseName}`);
+    } catch (error) {
+        const refs = page.state.releaseRefs.get(release.ReleaseId);
+        if (refs?.feedback) {
+            refs.feedback.dataset.tone = 'danger';
+            refs.feedback.textContent = `Magnet non copiato. ${error.message}`;
+        }
+    } finally {
+        button.disabled = false;
+        window.setTimeout(() => {
+            if (button.isConnected) {
+                button.textContent = originalText;
+                button.setAttribute('aria-label', `Copia magnet di ${release.ReleaseName}`);
+            }
+        }, 1500);
+    }
+}
+
+async function copyToClipboard(value) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+    }
+
+    const fallback = createElement('textarea', {
+        className: 'tc-clipboard-fallback',
+        attributes: { readonly: 'readonly', 'aria-hidden': 'true' }
+    });
+    fallback.value = value;
+    document.body.append(fallback);
+    fallback.select();
+    const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
+    fallback.remove();
+    if (!copied) {
+        throw new RequestError('La clipboard di sistema non è disponibile.', 0);
+    }
+}
+
+async function openPreflightModal(page, release, button, feedback) {
+    if (page.state.activePreflight) {
+        showStatus(page.elements.status, 'Completa o annulla prima la verifica già aperta.', 'warning');
+        return;
+    }
+
+    const modal = createPreflightModal(release);
+    const active = { release, button, feedback, modal, ready: false, completed: false };
+    page.state.activePreflight = active;
+    button.disabled = true;
+    button.textContent = 'Verifica…';
     button.setAttribute('aria-busy', 'true');
-    delete feedback.dataset.tone;
     feedback.replaceChildren();
+    delete feedback.dataset.tone;
+    page.view.append(modal.overlay);
+    modal.dialog.focus();
+
+    modal.cancelButton.addEventListener('click', () => handlePreflightCancel(page, active));
+    modal.retryButton.addEventListener('click', () => handlePreflightRetry(page, active));
+    modal.confirmButton.addEventListener('click', () => handlePreflightConfirm(page, active));
+
+    await runPreflight(page, active);
+}
+
+async function runPreflight(page, active) {
+    const { modal, release } = active;
+    active.ready = false;
+    modal.status.dataset.tone = 'info';
+    modal.status.textContent = 'Recupero dei metadati torrent e della dimensione effettiva…';
+    modal.retryButton.hidden = true;
+    modal.retryButton.disabled = true;
+    modal.cancelButton.disabled = true;
+    modal.confirmButton.disabled = true;
 
     try {
-        await startDownload(release.ReleaseId);
-        button.textContent = 'Inviata ✓';
-        renderDownloadSent(feedback);
+        const result = await startPreflight(release.ReleaseId);
+        if (page.state.activePreflight !== active) {
+            return;
+        }
+
+        renderPreflightResult(page, active, result);
     } catch (error) {
-        button.disabled = false;
-        button.textContent = 'Download';
-        feedback.dataset.tone = 'danger';
-        feedback.textContent = error.message;
-    } finally {
-        button.removeAttribute('aria-busy');
+        if (page.state.activePreflight !== active) {
+            return;
+        }
+
+        modal.status.dataset.tone = 'danger';
+        modal.status.textContent = `Verifica non riuscita. ${error.message}`;
+        modal.cancelButton.disabled = false;
+        modal.retryButton.hidden = false;
+        modal.retryButton.disabled = false;
+    }
+}
+
+function createPreflightModal(release) {
+    const titleId = `tcPreflight-${release.ReleaseId}`;
+    const overlay = createElement('div', { className: 'tc-preflight-overlay' });
+    const dialog = createElement('section', {
+        className: 'tc-preflight-modal',
+        attributes: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, tabindex: '-1' }
+    });
+    const title = createElement('h2', { className: 'tc-preflight-title', text: 'Verifica torrent', attributes: { id: titleId } });
+    const releaseName = createElement('p', { className: 'tc-preflight-release', text: release.ReleaseName });
+    const status = createElement('p', {
+        className: 'tc-preflight-status',
+        text: 'Recupero dei metadati torrent e della dimensione effettiva…',
+        attributes: { role: 'status', 'aria-live': 'polite' }
+    });
+    const details = createElement('dl', { className: 'tc-preflight-details' });
+    appendPreflightDetail(details, 'Fonte', release.Source || 'Non indicata');
+    appendPreflightDetail(details, 'Seeders', formatCount(release.Seeders));
+    appendPreflightDetail(details, 'Leechers', formatCount(release.Leechers));
+    appendPreflightDetail(details, 'Dimensione dichiarata dalla fonte', formatBytes(release.SizeBytes));
+    const actualSize = appendPreflightDetail(details, 'Dimensione (effettiva torrent)', '—');
+    const limitSize = appendPreflightDetail(details, 'Limite massimo', '—');
+    const actions = createElement('div', { className: 'tc-preflight-actions' });
+    const cancelButton = createElement('button', {
+        className: 'emby-button raised',
+        text: 'Annulla',
+        attributes: { type: 'button', disabled: 'disabled' }
+    });
+    const retryButton = createElement('button', {
+        className: 'emby-button raised',
+        text: 'Riprova',
+        attributes: { type: 'button', disabled: 'disabled', hidden: 'hidden' }
+    });
+    const confirmButton = createElement('button', {
+        className: 'emby-button raised button-submit',
+        text: 'Avvia download',
+        attributes: { type: 'button', disabled: 'disabled' }
+    });
+    actions.append(cancelButton, retryButton, confirmButton);
+    dialog.append(title, releaseName, status, details, actions);
+    overlay.append(dialog);
+    return { overlay, dialog, status, actualSize, limitSize, cancelButton, retryButton, confirmButton };
+}
+
+function appendPreflightDetail(details, label, value) {
+    const item = createElement('div', { className: 'tc-preflight-detail' });
+    const displayedValue = createElement('dd', { text: value });
+    item.append(createElement('dt', { text: label }), displayedValue);
+    details.append(item);
+    return displayedValue;
+}
+
+function renderPreflightResult(page, active, result) {
+    const { modal } = active;
+    modal.actualSize.textContent = formatBytes(result?.ActualSizeBytes);
+    modal.limitSize.textContent = result?.MaximumSizeBytes ? formatBytes(result.MaximumSizeBytes) : 'Non impostato';
+    updateActualSize(page, active.release.ReleaseId, result?.ActualSizeBytes);
+
+    if (isPreflightReady(result)) {
+        active.ready = true;
+        modal.status.dataset.tone = 'success';
+        modal.status.textContent = 'Dimensione verificata. Conferma per avviare il download.';
+        modal.confirmButton.disabled = false;
+        modal.cancelButton.disabled = false;
+        return;
+    }
+
+    modal.status.dataset.tone = 'danger';
+    modal.status.textContent = result?.Message || 'I metadati torrent non sono disponibili.';
+    modal.cancelButton.disabled = false;
+    if (isMetadataUnavailable(result)) {
+        modal.retryButton.hidden = false;
+        modal.retryButton.disabled = false;
+    }
+}
+
+export function isPreflightReady(result) {
+    return result?.Status === 0 || result?.Status === 'Ready';
+}
+
+function isMetadataUnavailable(result) {
+    return result?.Status === 2 || result?.Status === 'MetadataUnavailable';
+}
+
+function updateActualSize(page, releaseId, sizeBytes) {
+    const refs = page.state.releaseRefs.get(releaseId);
+    if (refs?.actualSize && typeof sizeBytes === 'number' && sizeBytes > 0) {
+        refs.actualSize.textContent = formatBytes(sizeBytes);
+    }
+}
+
+async function handlePreflightConfirm(page, active) {
+    if (!active.ready || page.state.activePreflight !== active) {
+        return;
+    }
+
+    const { modal } = active;
+    modal.confirmButton.disabled = true;
+    modal.cancelButton.disabled = true;
+    modal.status.textContent = 'Avvio del download…';
+    try {
+        await confirmPreflight(active.release.ReleaseId);
+        active.completed = true;
+        active.button.textContent = 'Inviata ✓';
+        renderDownloadSent(active.feedback);
+        closePreflightModal(page, active, { restoreButton: false });
+    } catch (error) {
+        modal.status.dataset.tone = 'danger';
+        modal.status.textContent = `Download non avviato. ${error.message}`;
+        modal.confirmButton.disabled = false;
+        modal.cancelButton.disabled = false;
+    }
+}
+
+async function handlePreflightRetry(page, active) {
+    if (page.state.activePreflight !== active || active.ready) {
+        return;
+    }
+
+    await runPreflight(page, active);
+}
+
+async function handlePreflightCancel(page, active) {
+    if (page.state.activePreflight !== active) {
+        return;
+    }
+
+    const { modal } = active;
+    modal.cancelButton.disabled = true;
+    modal.confirmButton.disabled = true;
+    try {
+        if (!active.completed) {
+            await cancelPreflight(active.release.ReleaseId);
+        }
+
+        closePreflightModal(page, active, { restoreButton: true });
+    } catch (error) {
+        modal.status.dataset.tone = 'danger';
+        modal.status.textContent = `Annullamento non riuscito. ${error.message}`;
+        modal.cancelButton.disabled = false;
+    }
+}
+
+function closePreflightModal(page, active, { restoreButton }) {
+    if (page.state.activePreflight !== active) {
+        return;
+    }
+
+    active.modal.overlay.remove();
+    page.state.activePreflight = null;
+    active.button.removeAttribute('aria-busy');
+    if (restoreButton) {
+        active.button.disabled = false;
+        active.button.textContent = 'Download';
+        active.button.focus();
     }
 }
 
@@ -1343,6 +1640,13 @@ function handleViewHide(page) {
 }
 
 function handleViewDestroy(page) {
+    const active = page.state.activePreflight;
+    if (active && !active.completed) {
+        active.modal.overlay.remove();
+        page.state.activePreflight = null;
+        void cancelPreflight(active.release.ReleaseId).catch(() => {});
+    }
+
     page.state.searchGeneration += 1;
     resetPosterLoading(page);
     page.state.posterObserver = null;

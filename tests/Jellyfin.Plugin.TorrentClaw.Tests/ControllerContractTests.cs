@@ -20,11 +20,15 @@ public sealed class ControllerContractTests
         [typeof(SearchController)] =
         [
             "POST TorrentClaw/Search",
-            "GET TorrentClaw/Search/{releaseId}/Poster"
+            "GET TorrentClaw/Search/{releaseId}/Poster",
+            "GET TorrentClaw/Search/{releaseId}/Magnet"
         ],
         [typeof(DownloadsController)] =
         [
             "POST TorrentClaw/Downloads",
+            "POST TorrentClaw/Downloads/Preflight",
+            "POST TorrentClaw/Downloads/Preflight/{releaseId}/Confirm",
+            "DELETE TorrentClaw/Downloads/Preflight/{releaseId}",
             "GET TorrentClaw/Downloads",
             "POST TorrentClaw/Downloads/{id:guid}/Pause",
             "POST TorrentClaw/Downloads/{id:guid}/Resume",
@@ -237,6 +241,12 @@ public sealed class ControllerContractTests
         public Task AuthenticateAsync(CancellationToken cancellationToken) => Unused();
 
         public Task AddTorrentAsync(string magnetUrl, string category, string savePath, CancellationToken cancellationToken) => Unused();
+
+        public Task AddMetadataPreflightAsync(
+            string magnetUrl,
+            string category,
+            string savePath,
+            CancellationToken cancellationToken) => Unused();
 
         public Task<TorrentStatus?> GetTorrentStatusAsync(string hash, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("qBittorrent must not be called.");

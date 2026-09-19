@@ -8,8 +8,8 @@ namespace Jellyfin.Plugin.TorrentClaw.Tests;
 
 public sealed class PluginArtifactTests
 {
-    private const string ExpectedVersion = "0.1.0";
-    private const string ExpectedAssemblyVersion = "0.1.0.0";
+    private const string ExpectedVersion = "0.1.1";
+    private const string ExpectedAssemblyVersion = "0.1.1.0";
     private static readonly string[] PageNames = [Plugin.SearchPageName, Plugin.DownloadsPageName, Plugin.SettingsPageName];
     private static readonly string[] ScriptSections =
     [

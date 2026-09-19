@@ -18,6 +18,16 @@ public interface IQbittorrentClient
         string savePath,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Adds a magnet and stops it as soon as qBittorrent has received the torrent metainfo.
+    /// This allows the plugin to verify the actual total size before content download is confirmed.
+    /// </summary>
+    Task AddMetadataPreflightAsync(
+        string magnetUrl,
+        string category,
+        string savePath,
+        CancellationToken cancellationToken);
+
     Task<TorrentStatus?> GetTorrentStatusAsync(string hash, CancellationToken cancellationToken);
 
     Task PauseAsync(string hash, CancellationToken cancellationToken);
@@ -58,18 +68,43 @@ public sealed class QbittorrentClient : IQbittorrentClient
         string savePath,
         CancellationToken cancellationToken)
     {
+        await AddTorrentCoreAsync(magnetUrl, category, savePath, stopWhenMetadataReceived: false, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task AddMetadataPreflightAsync(
+        string magnetUrl,
+        string category,
+        string savePath,
+        CancellationToken cancellationToken)
+    {
+        await AddTorrentCoreAsync(magnetUrl, category, savePath, stopWhenMetadataReceived: true, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task AddTorrentCoreAsync(
+        string magnetUrl,
+        string category,
+        string savePath,
+        bool stopWhenMetadataReceived,
+        CancellationToken cancellationToken)
+    {
         if (!Uri.TryCreate(magnetUrl, UriKind.Absolute, out var magnet)
             || !magnet.Scheme.Equals("magnet", StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("A valid magnet URI is required.", nameof(magnetUrl));
         }
 
-        using var content = new MultipartFormDataContent
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(magnetUrl), "urls");
+        content.Add(new StringContent(category ?? string.Empty), "category");
+        content.Add(new StringContent(savePath ?? string.Empty), "savepath");
+        if (stopWhenMetadataReceived)
         {
-            { new StringContent(magnetUrl), "urls" },
-            { new StringContent(category ?? string.Empty), "category" },
-            { new StringContent(savePath ?? string.Empty), "savepath" }
-        };
+            // Web API v2.8.15+: fetch the metainfo, then stop before the payload transfer starts.
+            content.Add(new StringContent("MetadataReceived"), "stop_condition");
+        }
+
         using var response = await SendAuthenticatedAsync(
             HttpMethod.Post,
             "api/v2/torrents/add",
