@@ -30,7 +30,9 @@ if (-not $resolvedStage.StartsWith($resolvedRepositoryRoot, [System.StringCompar
     throw "Refusing to clean a staging directory outside the repository."
 }
 
-dotnet build $project -c $Configuration --no-restore
+# Released binaries must not carry the local build tree: ContinuousIntegrationBuild normalises the
+# source and symbol paths the compiler would otherwise embed in the assembly and the PDB.
+dotnet build $project -c $Configuration --no-restore -p:ContinuousIntegrationBuild=true
 if ($LASTEXITCODE -ne 0) {
     throw "Plugin build failed."
 }
@@ -42,6 +44,14 @@ if (Test-Path -LiteralPath $stage) {
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $buildOutput "Jellyfin.Plugin.TorrentClaw.dll") -Destination $stage
 Copy-Item -LiteralPath (Join-Path $buildOutput "Jellyfin.Plugin.TorrentClaw.pdb") -Destination $stage
+
+# Last line of defence: never publish an artifact that leaks a developer's directory layout.
+foreach ($staged in Get-ChildItem -LiteralPath $stage -File) {
+    $text = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($staged.FullName))
+    if ($text -match 'C:\\Users\\' -or $text -match [regex]::Escape($resolvedRepositoryRoot.TrimEnd('\'))) {
+        throw "$($staged.Name) embeds a local build path and must not be published."
+    }
+}
 
 if (Test-Path -LiteralPath $archive) {
     Remove-Item -LiteralPath $archive -Force
