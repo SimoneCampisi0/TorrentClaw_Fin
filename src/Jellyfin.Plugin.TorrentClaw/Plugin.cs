@@ -37,12 +37,14 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// (the language picker and translations). Jellyfin serves every entry through
     /// <c>web/ConfigurationPage?name=...</c>; page names are prefixed because they are global across plugins.
     /// The Search page is listed first because the dashboard plugin card opens the first menu page.
+    /// Menu labels are fixed English strings: Jellyfin Web draws the side menu from the server page list and
+    /// cannot localise <see cref="PluginPageInfo.DisplayName"/>, while the UI language lives in the browser.
     /// </summary>
     public static IReadOnlyList<PluginPageInfo> CreatePages() =>
     [
-        CreateMenuPage(SearchPageName, "TorrentClaw · Cerca", "search", "Search.search.html"),
-        CreateMenuPage(DownloadsPageName, "TorrentClaw · Download", "download", "Downloads.downloads.html"),
-        CreateMenuPage(SettingsPageName, "TorrentClaw · Impostazioni", "settings", "Settings.settings.html"),
+        CreateMenuPage(SearchPageName, "TorrentClaw · Search", "search", "Search.search.html"),
+        CreateMenuPage(DownloadsPageName, "TorrentClaw · Downloads", "download", "Downloads.downloads.html"),
+        CreateMenuPage(SettingsPageName, "TorrentClaw · Settings", "settings", "Settings.settings.html"),
         CreateAssetPage(SearchPageName + ".js", "Search.search.js"),
         CreateAssetPage(SearchPageName + ".css", "Search.search.css"),
         CreateAssetPage(DownloadsPageName + ".js", "Downloads.downloads.js"),

@@ -85,6 +85,25 @@ public sealed class PluginArtifactTests
     }
 
     [Fact]
+    public void MenuPagesHaveFixedEnglishLabelsAndStableIdentity()
+    {
+        var menuPages = Plugin.CreatePages().Where(page => page.EnableInMainMenu).ToList();
+
+        // Jellyfin Web cannot localise DisplayName, so the side menu is English whatever the UI language picker says.
+        // Names (URLs), icons, section and order stay as they were.
+        Assert.Equal(
+            [
+                ("TorrentClawSearch", "TorrentClaw · Search", "search"),
+                ("TorrentClawDownloads", "TorrentClaw · Downloads", "download"),
+                ("TorrentClawSettings", "TorrentClaw · Settings", "settings")
+            ],
+            menuPages.Select(page => (page.Name, page.DisplayName, page.MenuIcon)));
+        Assert.All(menuPages, page => Assert.Equal("server", page.MenuSection));
+        Assert.All(menuPages, page =>
+            Assert.DoesNotMatch(new Regex(@"\b(Cerca|Ricerca|Impostazioni)\b", RegexOptions.IgnoreCase), page.DisplayName));
+    }
+
+    [Fact]
     public void HtmlPagesLoadTheirOwnScriptAndStylesheet()
     {
         foreach (var pageName in PageNames)

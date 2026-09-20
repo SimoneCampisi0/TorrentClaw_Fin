@@ -128,7 +128,7 @@ Removing an entry from TorrentClaw - Downloads removes the associated torrent fr
 
 The Search, Downloads, and Settings pages are shown in English by default. Use the flag picker at the top right of any page to switch to Italian (or back to English): the whole page, including its navigation, dates, numbers, and sizes, changes immediately without losing your inputs, search results, or download state.
 
-The choice is a per-browser-session preference kept in the browser's session storage, so it survives refreshes and applies to all three pages until the browser session ends. It is not a server setting, does not change the Jellyfin language, and is not stored in the plugin configuration. Audio and subtitle preferences keep their codes; only their labels change with the interface language. The page names in the Jellyfin dashboard menu are provided by the server and stay in Italian.
+The choice is a per-browser-session preference kept in the browser's session storage, so it survives refreshes and applies to all three pages until the browser session ends. It is not a server setting, does not change the Jellyfin language, and is not stored in the plugin configuration. Audio and subtitle preferences keep their codes; only their labels change with the interface language. The side-menu entries in the Jellyfin dashboard (TorrentClaw · Search, Downloads, Settings) are provided by the server and are always in English: the language chosen in the picker applies to the plugin pages, not to the menu.
 
 ## Security and privacy
 
