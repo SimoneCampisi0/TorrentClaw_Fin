@@ -16,7 +16,7 @@ It is designed for administrators who want the search, selection, download monit
 - Background qBittorrent monitoring and a Jellyfin library refresh request after a completed download.
 - Server-side poster proxy and bounded cache.
 - Secret-preserving configuration API: read operations expose configuration status, not API keys or passwords.
-- English and Italian interface, selectable from the flag picker in every page header (see Interface language).
+- English interface by default, with Italian available as a secondary language from the flag picker in every page header (see Interface language).
 
 ## Important notice
 
@@ -126,7 +126,14 @@ Removing an entry from TorrentClaw - Downloads removes the associated torrent fr
 
 ## Interface language
 
-The Search, Downloads, and Settings pages are shown in English by default. Use the flag picker at the top right of any page to switch to Italian (or back to English): the whole page, including its navigation, dates, numbers, and sizes, changes immediately without losing your inputs, search results, or download state.
+**English is the main language of TorrentClaw_Fin.** It is what every administrator sees by default, the language of the Jellyfin dashboard menu entries, and the fallback used whenever a translation is missing. **Italian is a secondary language**: a complete translation of the Search, Downloads, and Settings pages, offered as an alternative for those who prefer it.
+
+| Language | Role | Formatting locale |
+| --- | --- | --- |
+| English | Main and default | en-GB |
+| Italian | Secondary | it-IT |
+
+Use the flag picker at the top right of any page to switch between the two: the whole page, including its navigation, dates, numbers, and sizes, changes immediately without losing your inputs, search results, or download state. If a string is ever missing from the secondary language, its English text is shown in place of it, so the interface is never left untranslated.
 
 The choice is a per-browser-session preference kept in the browser's session storage, so it survives refreshes and applies to all three pages until the browser session ends. It is not a server setting, does not change the Jellyfin language, and is not stored in the plugin configuration. Audio and subtitle preferences keep their codes; only their labels change with the interface language. The side-menu entries in the Jellyfin dashboard (TorrentClaw · Search, Downloads, Settings) are provided by the server and are always in English: the language chosen in the picker applies to the plugin pages, not to the menu.
 
