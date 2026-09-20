@@ -1,6 +1,6 @@
 name: "TorrentClaw"
 guid: "7619f4e6-29bc-41e1-9232-d4eb06f1962c"
-version: "0.1.1"
+version: "0.1.2"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "TorrentClaw Jellyfin Plugin Contributors"
@@ -10,6 +10,8 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.TorrentClaw.dll"
 changelog: |-
+  0.1.2: add English and Italian interface languages to the Search, Downloads, and Settings pages with a flag
+  picker (English by default, per-browser-session choice), and show the dashboard side-menu entries in English.
   0.1.1: verify the selected torrent metainfo before download confirmation, display source and verified sizes,
   enforce the verified maximum size, and add an on-demand magnet copy action.
   0.1.0: first public GitHub release of TorrentClaw_Fin, with separate Search, Downloads, and Settings pages;

@@ -40,11 +40,11 @@ For development and packaging:
 
 The recommended installation path is the prebuilt release asset. No local build is required.
 
-1. Download [TorrentClaw_Fin_0.1.1.zip](https://github.com/SimoneCampisi0/TorrentClaw_Fin/releases/latest/download/TorrentClaw_Fin_0.1.1.zip) from the [latest GitHub Release](https://github.com/SimoneCampisi0/TorrentClaw_Fin/releases/latest).
+1. Download [TorrentClaw_Fin_0.1.2.zip](https://github.com/SimoneCampisi0/TorrentClaw_Fin/releases/latest/download/TorrentClaw_Fin_0.1.2.zip) from the [latest GitHub Release](https://github.com/SimoneCampisi0/TorrentClaw_Fin/releases/latest).
 2. Stop Jellyfin before replacing a plugin DLL.
 3. Create a versioned plugin folder, for example:
 
-       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_Fin_0.1.1
+       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_Fin_0.1.2
 
 4. Extract the ZIP into that folder.
 5. Start Jellyfin, sign in as an administrator, and configure the plugin through Server Dashboard.
@@ -59,15 +59,15 @@ From the repository root:
     dotnet test TorrentClaw.Jellyfin.slnx -c Release
     powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1
 
-The packaging script checks the version against build.yaml and creates TorrentClaw_Fin_0.1.1.zip plus its SHA-256 checksum in artifacts.
+The packaging script checks the version against build.yaml and creates TorrentClaw_Fin_0.1.2.zip plus its SHA-256 checksum in artifacts.
 
 ## Manual installation details
 
-1. Obtain TorrentClaw_Fin_0.1.1.zip from GitHub Releases or build it locally.
+1. Obtain TorrentClaw_Fin_0.1.2.zip from GitHub Releases or build it locally.
 2. Stop Jellyfin before replacing a plugin DLL.
 3. Create a versioned plugin folder in Jellyfin's plugins directory, for example:
 
-       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_Fin_0.1.1
+       C:\ProgramData\Jellyfin\Server\plugins\TorrentClaw_Fin_0.1.2
 
 4. Extract the release ZIP into that folder.
 5. Start Jellyfin and sign in with an administrator account.
