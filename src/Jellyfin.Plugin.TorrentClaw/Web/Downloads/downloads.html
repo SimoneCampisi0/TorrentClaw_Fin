@@ -4,6 +4,7 @@
      data-require="emby-button"
      data-controller="__plugin/TorrentClawDownloads.js">
     <link rel="stylesheet" href="configurationpage?name=TorrentClawDownloads.css">
+    <link rel="stylesheet" href="configurationpage?name=TorrentClawShared.css">
 
     <div data-role="content">
         <div class="content-primary tc-shell">
@@ -11,14 +12,29 @@
             <header class="tc-header">
                 <div class="tc-header-text">
                     <p class="tc-eyebrow">TorrentClaw</p>
-                    <h1 class="tc-title">Download</h1>
-                    <p class="tc-lead">Stato dei torrent inviati a qBittorrent da questo plugin. Al completamento viene richiesto l'aggiornamento della libreria Jellyfin.</p>
+                    <h1 class="tc-title" data-i18n="downloads.title">Downloads</h1>
+                    <p class="tc-lead" data-i18n="downloads.lead">Status of the torrents sent to qBittorrent by this plugin. When a download completes, a Jellyfin library refresh is requested.</p>
                 </div>
-                <nav class="tc-nav" aria-label="Pagine TorrentClaw">
-                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch">Cerca</a>
-                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads" aria-current="page">Download</a>
-                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings">Impostazioni</a>
+                <nav class="tc-nav" aria-label="TorrentClaw pages" data-i18n-attr="aria-label:nav.label">
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch" data-i18n="nav.search">Search</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads" aria-current="page" data-i18n="nav.downloads">Downloads</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings" data-i18n="nav.settings">Settings</a>
                 </nav>
+                <div class="tc-lang" data-language-picker>
+                    <button type="button" class="tc-lang-button" data-language-button aria-haspopup="listbox" aria-expanded="false" aria-controls="tcDownloadsLanguageList" aria-label="Interface language: English" title="Interface language: English">
+                        <span class="tc-lang-current" data-language-current aria-hidden="true"></span>
+                    </button>
+                    <ul id="tcDownloadsLanguageList" class="tc-lang-list" role="listbox" data-language-list aria-label="Interface language" hidden>
+                        <li class="tc-lang-option" role="option" data-language="en" aria-selected="true" tabindex="-1" title="English" data-i18n-attr="title:language.en">
+                            <svg class="tc-lang-flag" data-flag="en" viewBox="0 0 30 20" width="30" height="20" aria-hidden="true" focusable="false"></svg>
+                            <span class="tc-sr-only" data-i18n="language.en">English</span>
+                        </li>
+                        <li class="tc-lang-option" role="option" data-language="it" aria-selected="false" tabindex="-1" title="Italian" data-i18n-attr="title:language.it">
+                            <svg class="tc-lang-flag" data-flag="it" viewBox="0 0 30 20" width="30" height="20" aria-hidden="true" focusable="false"></svg>
+                            <span class="tc-sr-only" data-i18n="language.it">Italian</span>
+                        </li>
+                    </ul>
+                </div>
             </header>
 
             <aside class="tc-notice" role="note">
@@ -27,18 +43,18 @@
                     <path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                 </svg>
                 <div>
-                    <p class="tc-notice-title">Monitoraggio in memoria</p>
-                    <p class="tc-notice-text">L'elenco contiene solo i download avviati da questo plugin dall'ultimo avvio di Jellyfin. Dopo un riavvio i torrent restano in qBittorrent ma non compaiono più qui. La rimozione non cancella mai i file scaricati.</p>
+                    <p class="tc-notice-title" data-i18n="downloads.notice.title">In-memory monitoring</p>
+                    <p class="tc-notice-text" data-i18n="downloads.notice.text">The list only contains downloads started by this plugin since Jellyfin last started. After a restart the torrents stay in qBittorrent but no longer appear here. Removing never deletes downloaded files.</p>
                 </div>
             </aside>
 
             <div class="tc-toolbar">
                 <div class="tc-toolbar-text">
-                    <p id="tcDownloadSummary" class="tc-toolbar-summary">Caricamento dei download…</p>
-                    <p id="tcLastUpdated" class="tc-toolbar-meta">Aggiornamento automatico ogni 10 secondi mentre la pagina è visibile.</p>
+                    <p id="tcDownloadSummary" class="tc-toolbar-summary">Loading downloads…</p>
+                    <p id="tcLastUpdated" class="tc-toolbar-meta">Automatic refresh every 10 seconds while the page is visible.</p>
                 </div>
                 <button is="emby-button" id="tcRefreshButton" type="button" class="raised tc-refresh-button">
-                    <span>Aggiorna</span>
+                    <span data-i18n="downloads.toolbar.refresh">Refresh</span>
                 </button>
             </div>
 
@@ -63,9 +79,9 @@
                 <svg class="tc-empty-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <p class="tc-empty-title">Nessun download monitorato</p>
-                <p class="tc-empty-text">Scegli una release dalla pagina di ricerca e premi Download: comparirà qui con avanzamento, velocità e tempo stimato.</p>
-                <a class="tc-empty-link" href="#/configurationpage?name=TorrentClawSearch">Vai alla ricerca</a>
+                <p class="tc-empty-title" data-i18n="downloads.empty.title">No monitored downloads</p>
+                <p class="tc-empty-text" data-i18n="downloads.empty.text">Choose a release on the search page and press Download: it will appear here with progress, speed and estimated time.</p>
+                <a class="tc-empty-link" href="#/configurationpage?name=TorrentClawSearch" data-i18n="downloads.empty.link">Go to search</a>
             </div>
         </div>
     </div>

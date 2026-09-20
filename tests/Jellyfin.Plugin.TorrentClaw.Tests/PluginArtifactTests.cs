@@ -31,14 +31,22 @@ public sealed class PluginArtifactTests
         "Jellyfin.Plugin.TorrentClaw.Web.Downloads.downloads.js",
         "Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.html",
         "Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.css",
-        "Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.js"
+        "Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.js",
+        "Jellyfin.Plugin.TorrentClaw.Web.Shared.torrentclaw-i18n.js",
+        "Jellyfin.Plugin.TorrentClaw.Web.Shared.torrentclaw-shared.css"
     ];
+
+    private const string SharedScriptResource = "Jellyfin.Plugin.TorrentClaw.Web.Shared.torrentclaw-i18n.js";
 
     public static TheoryData<string> WebResources => ResourcesEndingWith(string.Empty);
 
     public static TheoryData<string> HtmlResources => ResourcesEndingWith(".html");
 
+    /// <summary>Every script, including the shared i18n module: they all follow the same safety rules.</summary>
     public static TheoryData<string> ScriptResources => ResourcesEndingWith(".js");
+
+    /// <summary>The page controllers, which also follow the section layout and export a controller.</summary>
+    public static TheoryData<string> ControllerScriptResources => ResourcesEndingWith(".js", except: SharedScriptResource);
 
     [Theory]
     [MemberData(nameof(WebResources))]
@@ -48,7 +56,7 @@ public sealed class PluginArtifactTests
     }
 
     [Fact]
-    public void OnlyTheNineWebResourcesAreEmbedded()
+    public void OnlyTheElevenWebResourcesAreEmbedded()
     {
         var embedded = typeof(Plugin).Assembly.GetManifestResourceNames()
             .Where(name => name.StartsWith("Jellyfin.Plugin.TorrentClaw.Web.", StringComparison.Ordinal))
@@ -64,7 +72,8 @@ public sealed class PluginArtifactTests
         var pages = Plugin.CreatePages();
         var resources = typeof(Plugin).Assembly.GetManifestResourceNames();
 
-        Assert.Equal(9, pages.Count);
+        // Three menu pages, a script and a stylesheet for each of them, plus the shared i18n script and stylesheet.
+        Assert.Equal(11, pages.Count);
         Assert.Equal(pages.Count, pages.Select(page => page.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(pages, page => Assert.Contains(page.EmbeddedResourcePath, resources));
         Assert.Equal(PageNames, pages.Where(page => page.EnableInMainMenu).Select(page => page.Name));
@@ -85,7 +94,46 @@ public sealed class PluginArtifactTests
 
             Assert.Contains($"data-controller=\"__plugin/{pageName}.js\"", html, StringComparison.Ordinal);
             Assert.Contains($"href=\"configurationpage?name={pageName}.css\"", html, StringComparison.Ordinal);
+            Assert.Contains($"href=\"configurationpage?name={Plugin.SharedStylesAssetName}\"", html, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void SharedI18nAssetsAreRegisteredAsPluginAssets()
+    {
+        var pages = Plugin.CreatePages();
+
+        foreach (var (assetName, resource) in new[]
+        {
+            (Plugin.SharedI18nAssetName, SharedScriptResource),
+            (Plugin.SharedStylesAssetName, "Jellyfin.Plugin.TorrentClaw.Web.Shared.torrentclaw-shared.css")
+        })
+        {
+            var page = Assert.Single(pages, candidate => candidate.Name == assetName);
+            Assert.False(page.EnableInMainMenu);
+            Assert.Equal(resource, page.EmbeddedResourcePath);
+        }
+
+        // Page controllers load the shared module through the asset name registered above.
+        var controllers = WebResourceNames.Where(name => name.EndsWith(".js", StringComparison.Ordinal) && name != SharedScriptResource);
+        foreach (var controller in controllers)
+        {
+            Assert.Contains($"name={Plugin.SharedI18nAssetName}", ReadResource(controller), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void SharedI18nModuleIsReadableAndKeepsTheLanguageContract()
+    {
+        var script = ReadResource(SharedScriptResource);
+
+        Assert.All(script.Split('\n'), line => Assert.True(line.TrimEnd('\r').Length <= 160, $"Line too long: {line}"));
+        Assert.Contains("export const SUPPORTED_LANGUAGES", script, StringComparison.Ordinal);
+        Assert.Contains("locale: 'en-GB'", script, StringComparison.Ordinal);
+        Assert.Contains("locale: 'it-IT'", script, StringComparison.Ordinal);
+        Assert.Contains("'torrentclaw.ui-language'", script, StringComparison.Ordinal);
+        Assert.Contains("sessionStorage", script, StringComparison.Ordinal);
+        Assert.Contains("export function createI18n", script, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -120,7 +168,7 @@ public sealed class PluginArtifactTests
     }
 
     [Theory]
-    [MemberData(nameof(ScriptResources))]
+    [MemberData(nameof(ControllerScriptResources))]
     public void ScriptsAreReadableAndOrganisedBySection(string resourceName)
     {
         var lines = ReadResource(resourceName).Split('\n');
@@ -201,10 +249,11 @@ public sealed class PluginArtifactTests
         Assert.DoesNotContain("12.0.0.3\"", File.ReadAllText(Path.Combine(root, "scripts", "package.ps1")), StringComparison.Ordinal);
     }
 
-    private static TheoryData<string> ResourcesEndingWith(string extension)
+    private static TheoryData<string> ResourcesEndingWith(string extension, string? except = null)
     {
         var data = new TheoryData<string>();
-        foreach (var name in WebResourceNames.Where(name => name.EndsWith(extension, StringComparison.Ordinal)))
+        foreach (var name in WebResourceNames.Where(name =>
+                     name.EndsWith(extension, StringComparison.Ordinal) && name != except))
         {
             data.Add(name);
         }

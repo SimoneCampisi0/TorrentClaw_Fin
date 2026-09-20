@@ -1,0 +1,121 @@
+/*
+ * TorrentClaw · Shared styles
+ * Language picker used by the Search, Downloads and Settings pages. Every selector is scoped to .tc-page,
+ * and colours come from the tokens each page defines (--tc-border-strong, --tc-surface, --tc-focus-ring, ...).
+ */
+
+/* ---------------------------------------------------------------------------
+ * Language picker (top right of the page header)
+ * ------------------------------------------------------------------------ */
+
+.tc-page .tc-header {
+    position: relative;
+}
+
+.tc-page .tc-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.tc-page .tc-lang {
+    position: absolute;
+    top: 0.6rem;
+    right: 0;
+    z-index: 20;
+}
+
+.tc-page .tc-lang-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    box-sizing: border-box;
+    min-width: 3rem;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0 0.7rem;
+    border: 1px solid var(--tc-border-strong);
+    border-radius: 999px;
+    background: var(--tc-surface);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.tc-page .tc-lang-button:hover {
+    background: var(--tc-surface-strong);
+}
+
+.tc-page .tc-lang-button::after {
+    content: "";
+    width: 0;
+    height: 0;
+    border: 0.28rem solid transparent;
+    border-top-color: currentColor;
+    border-bottom-width: 0;
+}
+
+.tc-page .tc-lang-button[aria-expanded="true"]::after {
+    transform: rotate(180deg);
+}
+
+.tc-page .tc-lang-current {
+    display: inline-flex;
+}
+
+.tc-page .tc-lang-flag {
+    display: block;
+    width: 1.65rem;
+    height: 1.1rem;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--tc-border-strong);
+}
+
+/* The list only shows flags, so it uses a fixed dark surface that reads well on every Jellyfin theme. */
+.tc-page .tc-lang-list {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    box-sizing: border-box;
+    min-width: 100%;
+    margin: 0;
+    padding: 0.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: var(--tc-radius-medium);
+    background: #23272e;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    list-style: none;
+}
+
+.tc-page .tc-lang-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.7rem;
+    border-radius: var(--tc-radius-small);
+    color: #ffffff;
+    cursor: pointer;
+    outline: none;
+}
+
+.tc-page .tc-lang-option:hover,
+.tc-page .tc-lang-option:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.tc-page .tc-lang-option[aria-selected="true"] {
+    background: var(--tc-accent-solid);
+}
+
+.tc-page .tc-lang-button:focus-visible,
+.tc-page .tc-lang-option:focus-visible {
+    outline: none;
+    box-shadow: var(--tc-focus-ring);
+}

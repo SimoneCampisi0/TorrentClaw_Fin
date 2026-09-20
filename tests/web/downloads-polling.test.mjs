@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createPollingController, resolveStateName } from '../../src/Jellyfin.Plugin.TorrentClaw/Web/Downloads/downloads.js';
+import {
+    createPollingController,
+    formatBytes,
+    formatDuration,
+    formatPercent,
+    getStateLabel,
+    i18nReady,
+    resolveStateName
+} from '../../src/Jellyfin.Plugin.TorrentClaw/Web/Downloads/downloads.js';
+import { setLanguage } from '../../src/Jellyfin.Plugin.TorrentClaw/Web/Shared/torrentclaw-i18n.js';
+
+await i18nReady;
 
 function createFakeTimers() {
     const active = new Map();
@@ -188,4 +199,39 @@ test('download states accept both enum names and numeric values', () => {
     assert.equal(resolveStateName({ State: 6 }), 'Completed');
     assert.equal(resolveStateName({ State: 'constructor' }), 'Unknown');
     assert.equal(resolveStateName({ State: 99 }), 'Unknown');
+});
+
+test('download state labels follow the active UI language while state names stay stable', () => {
+    const states = ['Waiting', 'Unknown', 'Queued', 'Downloading', 'Paused', 'Stalled', 'Checking', 'Completed', 'Error', 'MissingFiles'];
+    const english = [
+        'Waiting for status', 'Unknown status', 'Queued', 'Downloading', 'Paused', 'Stalled', 'Checking', 'Completed', 'Error', 'Missing files'
+    ];
+    const italian = [
+        'In attesa di stato', 'Stato sconosciuto', 'In coda', 'In download', 'In pausa', 'Bloccato', 'In verifica', 'Completato', 'Errore',
+        'File mancanti'
+    ];
+
+    setLanguage('en');
+    assert.deepEqual(states.map(getStateLabel), english);
+    setLanguage('it');
+    assert.deepEqual(states.map(getStateLabel), italian);
+    assert.equal(getStateLabel('SomethingNew'), 'Stato sconosciuto');
+    setLanguage('en');
+
+    assert.equal(resolveStateName({ State: 3 }), 'Paused');
+    assert.equal(resolveStateName({ State: 'MissingFiles' }), 'MissingFiles');
+});
+
+test('sizes, percentages and durations use the formatting locale and words of the active language', () => {
+    setLanguage('en');
+    assert.equal(formatBytes(1536 * 1024 * 1024), '1.50 GB');
+    assert.equal(formatPercent(42.5), '42.5%');
+    assert.equal(formatDuration(90), '1 min');
+    assert.equal(formatDuration(3 * 86400 + 5 * 3600), '3 d 5 h');
+
+    setLanguage('it');
+    assert.equal(formatBytes(1536 * 1024 * 1024), '1,50 GB');
+    assert.equal(formatPercent(42.5), '42,5%');
+    assert.equal(formatDuration(3 * 86400 + 5 * 3600), '3 g 5 h');
+    setLanguage('en');
 });

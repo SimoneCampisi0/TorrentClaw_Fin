@@ -9,6 +9,35 @@
  * Constants
  * ========================================================================== */
 
+// The shared module is served as a plugin asset next to this page, so it is resolved against the page URL
+// (and therefore honours a Jellyfin base path). In Node tests it is imported from the source tree.
+const I18N_ASSET_PATH = 'configurationpage?name=TorrentClawI18n.js';
+
+async function loadI18n() {
+    if (typeof window === 'undefined') {
+        return import('../Shared/torrentclaw-i18n.js');
+    }
+
+    return import(new URL(I18N_ASSET_PATH, window.location.href).href);
+}
+
+// Jellyfin loads a controller through a blob script whose "load" event fires before a module with top-level await
+// has finished evaluating, so the module must not await anything at the top level. The page is initialised
+// when the shared module is ready instead (tests await i18nReady before calling the exported helpers).
+let i18n = null;
+export const i18nReady = loadI18n().then(module => {
+    i18n = module;
+});
+
+const bindLanguagePicker = (...args) => i18n.bindLanguagePicker(...args);
+const createLocalizerRegistry = (...args) => i18n.createLocalizerRegistry(...args);
+const getLocale = (...args) => i18n.getLocale(...args);
+const message = (...args) => i18n.message(...args);
+const onLanguageChange = (...args) => i18n.onLanguageChange(...args);
+const resolveMessage = (...args) => i18n.resolveMessage(...args);
+const t = (...args) => i18n.t(...args);
+const translatePage = (...args) => i18n.translatePage(...args);
+
 const ENDPOINTS = Object.freeze({
     configuration: 'TorrentClaw/Configuration',
     search: 'TorrentClaw/Search',
@@ -34,15 +63,17 @@ const POSTER_STATE = Object.freeze({
     failed: 'failed'
 });
 
+// Media languages (audio and subtitles of a release). Codes and aliases are data used to normalise what
+// TorrentClaw reports; the displayed name is the dictionary entry "language.<code>" in the active UI language.
 const LANGUAGES = Object.freeze([
-    { code: 'it', name: 'Italiano', aliases: ['it', 'ita', 'italian', 'italiano'] },
-    { code: 'en', name: 'Inglese', aliases: ['en', 'eng', 'english', 'inglese'] },
-    { code: 'es', name: 'Spagnolo', aliases: ['es', 'spa', 'spanish', 'espanol', 'español', 'spagnolo'] },
-    { code: 'fr', name: 'Francese', aliases: ['fr', 'fra', 'fre', 'french', 'francais', 'français', 'francese'] },
-    { code: 'de', name: 'Tedesco', aliases: ['de', 'deu', 'ger', 'german', 'deutsch', 'tedesco'] },
-    { code: 'ja', name: 'Giapponese', aliases: ['ja', 'jpn', 'japanese', 'giapponese'] },
-    { code: 'pt', name: 'Portoghese', aliases: ['pt', 'por', 'portuguese', 'portoghese'] },
-    { code: 'ru', name: 'Russo', aliases: ['ru', 'rus', 'russian', 'russo'] }
+    { code: 'it', aliases: ['it', 'ita', 'italian', 'italiano'] },
+    { code: 'en', aliases: ['en', 'eng', 'english', 'inglese'] },
+    { code: 'es', aliases: ['es', 'spa', 'spanish', 'espanol', 'español', 'spagnolo'] },
+    { code: 'fr', aliases: ['fr', 'fra', 'fre', 'french', 'francais', 'français', 'francese'] },
+    { code: 'de', aliases: ['de', 'deu', 'ger', 'german', 'deutsch', 'tedesco'] },
+    { code: 'ja', aliases: ['ja', 'jpn', 'japanese', 'giapponese'] },
+    { code: 'pt', aliases: ['pt', 'por', 'portuguese', 'portoghese'] },
+    { code: 'ru', aliases: ['ru', 'rus', 'russian', 'russo'] }
 ]);
 
 const LANGUAGE_BY_ALIAS = new Map(
@@ -74,10 +105,10 @@ const CHANNEL_LAYOUTS = Object.freeze({
     8: '7.1'
 });
 
-const LANGUAGE_SOURCE_LABELS = Object.freeze({
-    Metadata: 'da metadati TorrentClaw',
-    Inferred: 'dedotto dal nome',
-    Unknown: 'non verificato'
+const LANGUAGE_SOURCE_LABEL_KEYS = Object.freeze({
+    Metadata: 'release.languageSource.Metadata',
+    Inferred: 'release.languageSource.Inferred',
+    Unknown: 'release.languageSource.Unknown'
 });
 
 const CODEC_LABELS = Object.freeze({
@@ -102,39 +133,48 @@ const HDR_LABELS = Object.freeze({
     hlg: 'HLG'
 });
 
-const RULE_LABELS = Object.freeze({
-    'requested audio language': 'lingua audio richiesta',
-    'requested audio language (metadata unavailable)': 'lingua audio richiesta (dato assente)',
-    'requested subtitle language': 'sottotitoli richiesti',
-    'requested subtitle language (metadata unavailable)': 'sottotitoli richiesti (dato assente)',
-    'no subtitles': 'nessun sottotitolo',
-    'no subtitles (TrueSpec)': 'nessun sottotitolo (TrueSpec)',
-    'no subtitles (metadata unavailable)': 'nessun sottotitolo (dato assente)',
-    'Size must be verified from torrent metadata': 'dimensione da verificare dal torrent',
-    'Size limit will be verified before download': 'limite dimensione da verificare prima del download',
-    'Source-reported size exceeds the limit; verify before download': 'dimensione della fonte oltre limite: verifica prima del download',
-    'minimum seeders': 'seeders minimi',
-    'magnet unavailable': 'magnet non disponibile',
-    resolution: 'risoluzione',
-    codec: 'codec',
-    HDR: 'HDR',
-    REMUX: 'REMUX',
-    'Resolution metadata unavailable': 'Risoluzione non indicata',
-    'Size metadata unavailable': 'Dimensione non indicata'
+// Rules arrive from the server as English identifiers: they map to dictionary keys shown in the UI language.
+const RULE_LABEL_KEYS = Object.freeze({
+    'requested audio language': 'rule.requestedAudio',
+    'requested audio language (metadata unavailable)': 'rule.requestedAudioNoData',
+    'requested subtitle language': 'rule.requestedSubtitles',
+    'requested subtitle language (metadata unavailable)': 'rule.requestedSubtitlesNoData',
+    'no subtitles': 'rule.noSubtitles',
+    'no subtitles (TrueSpec)': 'rule.noSubtitlesTrueSpec',
+    'no subtitles (metadata unavailable)': 'rule.noSubtitlesNoData',
+    'Size must be verified from torrent metadata': 'rule.sizeMustBeVerified',
+    'Size limit will be verified before download': 'rule.sizeLimitWillBeVerified',
+    'Source-reported size exceeds the limit; verify before download': 'rule.sizeExceedsLimit',
+    'minimum seeders': 'rule.minimumSeeders',
+    'magnet unavailable': 'rule.magnetUnavailable',
+    resolution: 'rule.resolution',
+    codec: 'rule.codec',
+    HDR: 'rule.hdr',
+    REMUX: 'rule.remux',
+    'Resolution metadata unavailable': 'rule.resolutionNoData',
+    'Size metadata unavailable': 'rule.sizeNoData'
 });
 
 const ACTIVE_FILTER_FIELDS = Object.freeze([
-    { id: 'tcResolution', label: 'Risoluzione', kind: 'select' },
-    { id: 'tcCodec', label: 'Codec', kind: 'select' },
-    { id: 'tcHdr', label: 'HDR', kind: 'select' },
-    { id: 'tcPreferRemux', label: 'REMUX preferito', kind: 'checkbox' },
-    { id: 'tcAudioLanguage', label: 'Audio', kind: 'select' },
-    { id: 'tcSubtitleLanguage', label: 'Sottotitoli', kind: 'select' },
-    { id: 'tcAudioFormat', label: 'Formato audio', kind: 'text' },
-    { id: 'tcMaxSize', label: 'Max', kind: 'text', suffix: ' GB' },
-    { id: 'tcMinSeeders', label: 'Seeders ≥', kind: 'text' },
-    { id: 'tcVerifiedOnly', label: 'Solo TrueSpec', kind: 'checkbox' }
+    { id: 'tcResolution', labelKey: 'search.active.field.resolution', kind: 'select' },
+    { id: 'tcCodec', labelKey: 'search.active.field.codec', kind: 'select' },
+    { id: 'tcHdr', labelKey: 'search.active.field.hdr', kind: 'select' },
+    { id: 'tcPreferRemux', labelKey: 'search.active.field.remux', kind: 'checkbox' },
+    { id: 'tcAudioLanguage', labelKey: 'search.active.field.audio', kind: 'select' },
+    { id: 'tcSubtitleLanguage', labelKey: 'search.active.field.subtitles', kind: 'select' },
+    { id: 'tcAudioFormat', labelKey: 'search.active.field.audioFormat', kind: 'text' },
+    { id: 'tcMaxSize', labelKey: 'search.active.field.maxSize', kind: 'text', suffix: ' GB' },
+    { id: 'tcMinSeeders', labelKey: 'search.active.field.minSeeders', kind: 'text' },
+    { id: 'tcVerifiedOnly', labelKey: 'search.active.field.verified', kind: 'checkbox' }
 ]);
+
+const DOWNLOAD_BUTTON_KEYS = Object.freeze({
+    idle: 'release.download',
+    checking: 'release.download.checking',
+    sent: 'release.download.sent'
+});
+
+const COPY_BUTTON_SYMBOLS = Object.freeze({ idle: '⧉', busy: '…', copied: '✓' });
 
 /* =============================================================================
  * DOM helpers
@@ -154,6 +194,12 @@ function createElement(tagName, options = {}) {
         element.textContent = String(options.text);
     }
 
+    // Static texts are marked with data-i18n, so translatePage() keeps them in the active language.
+    if (options.i18n) {
+        element.setAttribute('data-i18n', options.i18n);
+        element.textContent = t(options.i18n);
+    }
+
     for (const [name, value] of Object.entries(options.attributes ?? {})) {
         element.setAttribute(name, String(value));
     }
@@ -170,33 +216,45 @@ function createSvgElement(tagName, attributes = {}) {
     return element;
 }
 
-function showStatus(statusElement, message, tone = 'info', link = null) {
-    statusElement.replaceChildren(createElement('span', { text: message }));
-    if (link) {
-        statusElement.append(createElement('a', {
-            className: 'tc-status-link',
-            text: link.text,
-            attributes: { href: link.href }
-        }));
+function renderStatus(page) {
+    const { elements, state } = page;
+    if (!state.status) {
+        elements.status.hidden = true;
+        elements.status.replaceChildren();
+        return;
     }
 
-    statusElement.dataset.tone = tone;
-    statusElement.hidden = false;
+    elements.status.replaceChildren(createElement('span', { text: resolveMessage(state.status.descriptor) }));
+    elements.status.dataset.tone = state.status.tone;
+    elements.status.hidden = false;
 }
 
-function hideStatus(statusElement) {
-    statusElement.hidden = true;
-    statusElement.replaceChildren();
+/** Shows a message that is kept as a descriptor, so it can be shown again in another language. */
+function showStatus(page, descriptor, tone = 'info') {
+    page.state.status = { descriptor, tone };
+    renderStatus(page);
 }
 
-function setFieldError(input, errorElement, message) {
-    if (message) {
-        errorElement.textContent = message;
+function hideStatus(page) {
+    page.state.status = null;
+    renderStatus(page);
+}
+
+/** Message shown for a failed request; anything that is not a RequestError gets a generic text. */
+function describeError(error) {
+    return error?.descriptor ?? message('error.generic');
+}
+
+function setFieldError(page, input, errorElement, problem) {
+    if (problem) {
+        page.state.fieldErrors.set(errorElement, problem);
+        errorElement.textContent = resolveMessage(problem);
         errorElement.hidden = false;
         input.setAttribute('aria-invalid', 'true');
         return;
     }
 
+    page.state.fieldErrors.delete(errorElement);
     errorElement.textContent = '';
     errorElement.hidden = true;
     input.removeAttribute('aria-invalid');
@@ -217,9 +275,9 @@ function asArray(value) {
  * Formatting and language normalisation
  * ========================================================================== */
 
-function formatBytes(bytes) {
+export function formatBytes(bytes) {
     if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
-        return 'Sconosciuta';
+        return t('common.unknown');
     }
 
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -231,7 +289,7 @@ function formatBytes(bytes) {
     }
 
     const decimals = unitIndex >= 3 ? 2 : 1;
-    const formatted = value.toLocaleString('it-IT', {
+    const formatted = value.toLocaleString(getLocale(), {
         minimumFractionDigits: unitIndex === 0 ? 0 : decimals,
         maximumFractionDigits: unitIndex === 0 ? 0 : decimals
     });
@@ -239,7 +297,7 @@ function formatBytes(bytes) {
 }
 
 function formatCount(value) {
-    return Number.isFinite(value) ? value.toLocaleString('it-IT') : '—';
+    return Number.isFinite(value) ? value.toLocaleString(getLocale()) : '—';
 }
 
 function toTechnicalKey(value) {
@@ -265,13 +323,13 @@ function formatHdr(hdr) {
     return HDR_LABELS[toTechnicalKey(hdr)] ?? String(hdr);
 }
 
-function translateRule(rule) {
+export function translateRule(rule) {
     const text = String(rule);
     if (text.startsWith('Threat level:')) {
-        return `Livello di rischio: ${text.slice('Threat level:'.length).trim()}`;
+        return t('rule.threatLevel', { level: text.slice('Threat level:'.length).trim() });
     }
 
-    return RULE_LABELS[text] ?? text;
+    return Object.hasOwn(RULE_LABEL_KEYS, text) ? t(RULE_LABEL_KEYS[text]) : text;
 }
 
 /**
@@ -280,21 +338,34 @@ function translateRule(rule) {
  */
 export function normalizeLanguage(value) {
     const key = String(value ?? '').trim().toLowerCase();
+    // "name" is a getter: the display name always follows the active UI language, even for a stored result.
     if (key === '' || UNKNOWN_LANGUAGE_VALUES.has(key)) {
-        return { key: 'unknown', code: null, name: 'Lingua sconosciuta', recognized: false, displayCode: null };
+        return {
+            key: 'unknown',
+            code: null,
+            get name() { return t('language.unknown'); },
+            recognized: false,
+            displayCode: null
+        };
     }
 
     const primarySubtag = key.split(/[-_]/)[0];
     const language = LANGUAGE_BY_ALIAS.get(key) ?? LANGUAGE_BY_ALIAS.get(primarySubtag);
     if (language) {
-        return { key: language.code, code: language.code, name: language.name, recognized: true, displayCode: null };
+        return {
+            key: language.code,
+            code: language.code,
+            get name() { return t(`language.${language.code}`); },
+            recognized: true,
+            displayCode: null
+        };
     }
 
     const displayCode = key.toUpperCase();
     return {
         key: `other:${key}`,
         code: null,
-        name: `Lingua sconosciuta (${displayCode})`,
+        get name() { return t('language.unknownWithCode', { code: displayCode }); },
         recognized: false,
         displayCode
     };
@@ -306,7 +377,7 @@ export function formatChannelLayout(channels) {
         return null;
     }
 
-    return CHANNEL_LAYOUTS[count] ?? `${count} canali`;
+    return CHANNEL_LAYOUTS[count] ?? t('release.channels', { count });
 }
 
 export function parsePreferredLanguageKeys(...values) {
@@ -357,10 +428,12 @@ export function collectAudioEntries(release, preferredLanguageKeys = []) {
     const entries = tracks.length > 0
         ? tracks.map(track => ({
             language: normalizeLanguage(readTrackValue(track, 'lang')),
+            channelCount: readTrackValue(track, 'channels'),
             channelLayout: formatChannelLayout(readTrackValue(track, 'channels'))
         }))
         : asArray(release.AudioLanguages).map(code => ({
             language: normalizeLanguage(code),
+            channelCount: null,
             channelLayout: null
         }));
 
@@ -379,7 +452,7 @@ export function collectSubtitleEntries(release, preferredLanguageKeys = []) {
     return orderByLanguagePreference(uniqueEntries, preferredLanguageKeys);
 }
 
-function describeAudioTrack(track) {
+export function describeAudioTrack(track) {
     const parts = [normalizeLanguage(readTrackValue(track, 'lang')).name];
     const codec = readTrackValue(track, 'codec');
     const channelLayout = formatChannelLayout(readTrackValue(track, 'channels'));
@@ -393,7 +466,7 @@ function describeAudioTrack(track) {
     }
 
     if (readTrackValue(track, 'default')) {
-        parts.push('predefinita');
+        parts.push(t('release.track.default.audio'));
     }
 
     if (title) {
@@ -403,7 +476,7 @@ function describeAudioTrack(track) {
     return parts.join(' · ');
 }
 
-function describeSubtitleTrack(track) {
+export function describeSubtitleTrack(track) {
     const parts = [normalizeLanguage(readTrackValue(track, 'lang')).name];
     const codec = readTrackValue(track, 'codec');
     const title = readTrackValue(track, 'title');
@@ -412,11 +485,11 @@ function describeSubtitleTrack(track) {
     }
 
     if (readTrackValue(track, 'forced')) {
-        parts.push('forzati');
+        parts.push(t('release.track.forced'));
     }
 
     if (readTrackValue(track, 'default')) {
-        parts.push('predefiniti');
+        parts.push(t('release.track.default.subtitle'));
     }
 
     if (title) {
@@ -441,9 +514,10 @@ function getTitleInitials(title) {
  * ========================================================================== */
 
 class RequestError extends Error {
-    constructor(message, status) {
-        super(message);
+    constructor(descriptor, status) {
+        super(descriptor.key);
         this.name = 'RequestError';
+        this.descriptor = descriptor;
         this.status = status;
     }
 }
@@ -469,7 +543,7 @@ async function toRequestError(failure) {
     }
 
     if (!failure || typeof failure.status !== 'number') {
-        return new RequestError('Impossibile contattare il server Jellyfin. Controlla la connessione e riprova.', 0);
+        return new RequestError(message('error.network'), 0);
     }
 
     const problem = await readProblemDetails(failure);
@@ -487,26 +561,26 @@ async function readProblemDetails(response) {
 
 function describeFailure(status, problem) {
     if (problem?.errors) {
-        return 'Alcuni valori inviati non sono validi. Controlla i campi e riprova.';
+        return message('search.error.validation');
     }
 
     if (problem?.title && problem?.detail) {
-        return `${problem.title}. ${problem.detail}`;
+        return message('common.reason', { title: problem.title, detail: problem.detail });
     }
 
     if (status === 401 || status === 403) {
-        return 'Sessione scaduta o permessi insufficienti: accedi di nuovo come amministratore.';
+        return message('error.unauthorized');
     }
 
     if (status === 404) {
-        return 'Risorsa non trovata. Ripeti la ricerca e riprova.';
+        return message('search.error.notFound');
     }
 
     if (status >= 500) {
-        return 'Il server ha riscontrato un errore imprevisto. Riprova più tardi.';
+        return message('error.server');
     }
 
-    return 'La richiesta non è andata a buon fine. Riprova.';
+    return message('error.generic');
 }
 
 function fetchConfiguration() {
@@ -610,7 +684,15 @@ function createPageState() {
         activePosterRequests: 0,
         posterObjectUrls: new Set(),
         releaseRefs: new Map(),
-        activePreflight: null
+        activePreflight: null,
+        // Language-independent state, kept so the visible texts can be rendered again when the language changes.
+        isSearching: false,
+        status: null,
+        fieldErrors: new Map(),
+        resultSummary: null,
+        resultLocalizers: createLocalizerRegistry(),
+        modalLocalizers: createLocalizerRegistry(),
+        unsubscribeLanguage: null
     };
 }
 
@@ -639,11 +721,11 @@ function readPositiveNumber(rawValue) {
 
 function getQueryError(query) {
     if (query === '') {
-        return 'Inserisci un titolo da cercare.';
+        return message('search.error.query.required');
     }
 
     if (query.length > MAX_QUERY_LENGTH) {
-        return `Il titolo può contenere al massimo ${MAX_QUERY_LENGTH} caratteri.`;
+        return message('search.error.query.tooLong', { max: MAX_QUERY_LENGTH });
     }
 
     return null;
@@ -656,11 +738,11 @@ function getNonNegativeNumberError(rawValue, { integerOnly }) {
 
     const value = Number(rawValue);
     if (!Number.isFinite(value) || value < 0) {
-        return 'Inserisci un numero maggiore o uguale a zero.';
+        return message('search.error.number.nonNegative');
     }
 
     if (integerOnly && !Number.isInteger(value)) {
-        return 'Inserisci un numero intero.';
+        return message('search.error.number.integer');
     }
 
     return null;
@@ -669,24 +751,24 @@ function getNonNegativeNumberError(rawValue, { integerOnly }) {
 function validateSearchForm(page) {
     const { elements } = page;
     const checks = [
-        { input: elements.query, error: elements.queryError, message: getQueryError(elements.query.value.trim()) },
+        { input: elements.query, error: elements.queryError, problem: getQueryError(elements.query.value.trim()) },
         {
             input: elements.maxSize,
             error: elements.maxSizeError,
-            message: getNonNegativeNumberError(elements.maxSize.value, { integerOnly: false })
+            problem: getNonNegativeNumberError(elements.maxSize.value, { integerOnly: false })
         },
         {
             input: elements.minSeeders,
             error: elements.minSeedersError,
-            message: getNonNegativeNumberError(elements.minSeeders.value, { integerOnly: true })
+            problem: getNonNegativeNumberError(elements.minSeeders.value, { integerOnly: true })
         }
     ];
 
     for (const check of checks) {
-        setFieldError(check.input, check.error, check.message);
+        setFieldError(page, check.input, check.error, check.problem);
     }
 
-    const firstInvalid = checks.find(check => check.message);
+    const firstInvalid = checks.find(check => check.problem);
     if (!firstInvalid) {
         return true;
     }
@@ -705,16 +787,22 @@ function validateSearchForm(page) {
 
 function setSearchBusy(page, isBusy) {
     const { elements } = page;
+    page.state.isSearching = isBusy;
     elements.searchButton.disabled = isBusy;
-    elements.searchButtonLabel.textContent = isBusy ? 'Ricerca…' : 'Cerca';
+    renderSearchButton(page);
     elements.form.setAttribute('aria-busy', String(isBusy));
     elements.skeletonList.hidden = !isBusy;
+}
+
+function renderSearchButton(page) {
+    page.elements.searchButtonLabel.textContent = t(page.state.isSearching ? 'search.button.busy' : 'search.button');
 }
 
 function clearResults(page) {
     const { elements } = page;
     resetPosterLoading(page);
     page.state.releaseRefs.clear();
+    page.state.resultLocalizers.clear();
     elements.resultList.replaceChildren();
     elements.resultsHeader.hidden = true;
     elements.emptyState.hidden = true;
@@ -729,15 +817,37 @@ function renderResults(page, releases) {
     const hasResults = releases.length > 0;
     elements.resultsHeader.hidden = !hasResults;
     elements.emptyState.hidden = hasResults;
-    elements.resultsCount.textContent = describeResultCount(releases);
+    page.state.resultSummary = { total: releases.length, eligible: releases.filter(release => release.Eligible).length };
+    renderResultsCount(page);
     observePendingPosters(page);
 }
 
-function describeResultCount(releases) {
-    const eligibleCount = releases.filter(release => release.Eligible).length;
-    const releaseText = releases.length === 1 ? '1 release' : `${releases.length} release`;
-    const eligibleText = eligibleCount === 1 ? '1 idonea' : `${eligibleCount} idonee`;
-    return `${releaseText} · ${eligibleText}`;
+function renderResultsCount(page) {
+    const summary = page.state.resultSummary;
+    page.elements.resultsCount.textContent = summary
+        ? t('search.results.summary', {
+            releases: message('search.results.releases', { count: summary.total }),
+            eligible: message('search.results.eligible', { count: summary.eligible })
+        })
+        : '';
+}
+
+/**
+ * Refreshes every text that is not covered by data-i18n markers: chips, status, errors and the localised parts
+ * of the cards and dialog already on screen. Nothing is rebuilt, so inputs, results and downloads are kept.
+ */
+function renderLanguage(page) {
+    translatePage(page.view);
+    renderSearchButton(page);
+    renderActiveFilters(page);
+    renderStatus(page);
+    renderResultsCount(page);
+    for (const [errorElement, problem] of page.state.fieldErrors) {
+        errorElement.textContent = resolveMessage(problem);
+    }
+
+    page.state.resultLocalizers.refresh();
+    page.state.modalLocalizers.refresh();
 }
 
 function renderActiveFilters(page) {
@@ -749,13 +859,14 @@ function renderActiveFilters(page) {
     elements.activeFilterList.replaceChildren(...activeFilters.map(filter => createFilterChip(page, filter)));
     elements.noActiveFilters.hidden = activeFilters.length > 0;
     elements.filterCount.hidden = activeFilters.length === 0;
-    elements.filterCount.textContent = activeFilters.length === 1 ? '1 attivo' : `${activeFilters.length} attivi`;
+    elements.filterCount.textContent = t('search.filters.count', { count: activeFilters.length });
 }
 
 function describeActiveFilter(view, field) {
     const control = view.querySelector(`#${field.id}`);
+    const label = t(field.labelKey);
     if (field.kind === 'checkbox') {
-        return control.checked ? { control, text: field.label } : null;
+        return control.checked ? { control, text: label } : null;
     }
 
     const value = control.value.trim();
@@ -766,7 +877,7 @@ function describeActiveFilter(view, field) {
     const displayValue = field.kind === 'select'
         ? control.selectedOptions[0]?.textContent.trim() ?? value
         : value;
-    return { control, text: `${field.label}: ${displayValue}${field.suffix ?? ''}` };
+    return { control, text: `${label}: ${displayValue}${field.suffix ?? ''}` };
 }
 
 function createFilterChip(page, filter) {
@@ -774,7 +885,7 @@ function createFilterChip(page, filter) {
     const removeButton = createElement('button', {
         className: 'tc-chip-remove',
         text: '×',
-        attributes: { type: 'button', 'aria-label': `Rimuovi filtro ${filter.text}` }
+        attributes: { type: 'button', 'aria-label': t('search.active.remove', { filter: filter.text }) }
     });
     removeButton.addEventListener('click', () => handleRemoveFilter(page, filter.control));
     chip.append(createElement('span', { text: filter.text }), removeButton);
@@ -788,24 +899,34 @@ function createReleaseCard(page, release) {
         attributes: { 'aria-labelledby': headingId, 'data-eligible': String(Boolean(release.Eligible)) }
     });
 
+    // refs keeps the language-independent state of the card; render() draws it in the active language.
+    const registry = page.state.resultLocalizers;
+    const refs = {
+        actualSize: null,
+        actualSizeBytes: null,
+        downloadButton: null,
+        feedback: null,
+        ui: { feedback: null, downloadState: 'idle', copyState: 'idle' },
+        render: null
+    };
+
     const body = createElement('div', { className: 'tc-release-body' });
-    const stats = createStatsList(release);
-    const footer = createReleaseFooter(page, release);
+    const stats = createStatsList(registry, release, refs);
+    const footer = createReleaseFooter(page, release, refs);
+    const copyButton = createCopyMagnetButton(page, release, refs);
     body.append(
-        createReleaseHeading(release, headingId),
-        createBadgeList(release),
+        createReleaseHeading(registry, release, headingId),
+        createBadgeList(registry, release),
         createTrackSummary(page, release),
-        stats.list,
-        createDetailsPanel(release),
-        footer.root
+        stats,
+        createDetailsPanel(registry, release),
+        footer
     );
 
-    page.state.releaseRefs.set(release.ReleaseId, {
-        actualSize: stats.actualSize,
-        downloadButton: footer.button,
-        feedback: footer.feedback
-    });
-    card.append(createPosterFrame(release), body, createCopyMagnetButton(page, release));
+    refs.render = () => renderReleaseState(refs, release, copyButton);
+    registry.run(refs.render);
+    page.state.releaseRefs.set(release.ReleaseId, refs);
+    card.append(createPosterFrame(release), body, copyButton);
     return card;
 }
 
@@ -843,7 +964,7 @@ function createFilmIcon() {
     return icon;
 }
 
-function createReleaseHeading(release, headingId) {
+function createReleaseHeading(registry, release, headingId) {
     const heading = createElement('header', { className: 'tc-release-heading' });
     const title = createElement('h3', { className: 'tc-release-title', text: release.Title, attributes: { id: headingId } });
     if (Number.isInteger(release.Year)) {
@@ -860,13 +981,16 @@ function createReleaseHeading(release, headingId) {
     }
 
     if (release.Source) {
-        heading.append(createElement('p', { className: 'tc-release-source', text: `Fonte: ${release.Source}` }));
+        heading.append(registry.text(
+            createElement('p', { className: 'tc-release-source' }),
+            () => t('release.source', { source: release.Source })
+        ));
     }
 
     return heading;
 }
 
-function createBadgeList(release) {
+function createBadgeList(registry, release) {
     const badges = [];
     if (release.Resolution) {
         badges.push({ text: release.Resolution, variant: 'resolution' });
@@ -891,18 +1015,23 @@ function createBadgeList(release) {
     }
 
     if (release.TrueSpec) {
-        badges.push({ text: 'TrueSpec ✓', variant: 'verified', label: 'Verificata TrueSpec' });
+        badges.push({ text: 'TrueSpec ✓', variant: 'verified', labelKey: 'release.badge.trueSpec.label' });
     }
 
     if (badges.length === 0) {
-        badges.push({ text: 'Metadati video non disponibili', variant: 'muted' });
+        badges.push({ textKey: 'release.badge.noVideoMetadata', variant: 'muted' });
     }
 
-    const list = createElement('ul', { className: 'tc-badges', attributes: { 'aria-label': 'Caratteristiche della release' } });
+    const list = createElement('ul', { className: 'tc-badges' });
+    registry.attribute(list, 'aria-label', () => t('release.badges.label'));
     for (const badge of badges) {
         const item = createElement('li', { className: `tc-badge tc-badge-${badge.variant}`, text: badge.text });
-        if (badge.label) {
-            item.setAttribute('aria-label', badge.label);
+        if (badge.textKey) {
+            registry.text(item, () => t(badge.textKey));
+        }
+
+        if (badge.labelKey) {
+            registry.attribute(item, 'aria-label', () => t(badge.labelKey));
         }
 
         list.append(item);
@@ -912,49 +1041,56 @@ function createBadgeList(release) {
 }
 
 function createTrackSummary(page, release) {
+    const registry = page.state.resultLocalizers;
     const container = createElement('div', { className: 'tc-tracks' });
     container.append(
-        createTrackGroup({
-            title: 'Audio',
+        createTrackGroup(registry, {
+            titleKey: 'release.tracks.audio',
             entries: collectAudioEntries(release, page.state.preferredAudioKeys),
-            sourceLabel: LANGUAGE_SOURCE_LABELS[release.AudioLanguageSource],
-            emptyText: 'Lingue non indicate'
+            sourceKey: LANGUAGE_SOURCE_LABEL_KEYS[release.AudioLanguageSource],
+            emptyKey: 'release.tracks.audioEmpty'
         }),
-        createTrackGroup({
-            title: 'Sottotitoli',
+        createTrackGroup(registry, {
+            titleKey: 'release.tracks.subtitles',
             entries: collectSubtitleEntries(release, page.state.preferredSubtitleKeys),
-            sourceLabel: LANGUAGE_SOURCE_LABELS[release.SubtitleLanguageSource],
-            emptyText: release.SubtitleLanguageSource === 'TrueSpec' ? 'Nessun sottotitolo' : 'Non indicati'
+            sourceKey: LANGUAGE_SOURCE_LABEL_KEYS[release.SubtitleLanguageSource],
+            emptyKey: release.SubtitleLanguageSource === 'TrueSpec' ? 'release.tracks.subtitlesNone' : 'release.tracks.subtitlesEmpty'
         })
     );
     return container;
 }
 
-function createTrackGroup({ title, entries, sourceLabel, emptyText }) {
+function createTrackGroup(registry, { titleKey, entries, sourceKey, emptyKey }) {
     const group = createElement('div', { className: 'tc-track-group' });
-    const heading = createElement('h4', { className: 'tc-track-heading', text: title });
-    if (sourceLabel) {
-        heading.append(createElement('span', { className: 'tc-track-source', text: sourceLabel }));
+    const heading = createElement('h4', { className: 'tc-track-heading' });
+    const titleText = document.createTextNode('');
+    registry.run(() => {
+        titleText.data = t(titleKey);
+    });
+    heading.append(titleText);
+    if (sourceKey) {
+        heading.append(registry.text(createElement('span', { className: 'tc-track-source' }), () => t(sourceKey)));
     }
 
     group.append(heading);
     if (entries.length === 0) {
-        group.append(createElement('p', { className: 'tc-track-empty', text: emptyText }));
+        group.append(registry.text(createElement('p', { className: 'tc-track-empty' }), () => t(emptyKey)));
         return group;
     }
 
-    const list = createElement('ul', { className: 'tc-language-list', attributes: { 'aria-label': title } });
+    const list = createElement('ul', { className: 'tc-language-list' });
+    registry.attribute(list, 'aria-label', () => t(titleKey));
     for (const entry of entries) {
-        list.append(createLanguageItem(entry));
+        list.append(createLanguageItem(registry, entry));
     }
 
     group.append(list);
     return group;
 }
 
-function createLanguageItem(entry) {
+function createLanguageItem(registry, entry) {
     const item = createElement('li', { className: 'tc-language-item' });
-    item.append(createLanguageIcon(entry.language));
+    item.append(createLanguageIcon(registry, entry.language));
     if (entry.language.displayCode) {
         item.append(createElement('span', {
             className: 'tc-language-code',
@@ -964,28 +1100,34 @@ function createLanguageItem(entry) {
     }
 
     if (entry.channelLayout) {
-        item.append(createElement('span', { className: 'tc-channel-layout', text: entry.channelLayout }));
+        item.append(registry.text(
+            createElement('span', { className: 'tc-channel-layout' }),
+            () => formatChannelLayout(entry.channelCount)
+        ));
     }
 
     return item;
 }
 
-function createLanguageIcon(language) {
+function createLanguageIcon(registry, language) {
     const design = language.recognized ? FLAG_DESIGNS[language.code] : null;
     if (!design) {
-        return createElement('span', {
+        const unknown = createElement('span', {
             className: 'tc-language-unknown',
             text: UNKNOWN_LANGUAGE_SYMBOL,
-            attributes: { role: 'img', 'aria-label': language.name, title: language.name }
+            attributes: { role: 'img' }
         });
+        registry.attribute(unknown, 'aria-label', () => language.name);
+        registry.attribute(unknown, 'title', () => language.name);
+        return unknown;
     }
 
     const flag = createFlagSvg(design);
     flag.setAttribute('role', 'img');
-    flag.setAttribute('aria-label', language.name);
+    registry.attribute(flag, 'aria-label', () => language.name);
 
     const title = createSvgElement('title');
-    title.textContent = language.name;
+    registry.text(title, () => language.name);
     flag.prepend(title);
     return flag;
 }
@@ -1042,83 +1184,96 @@ function appendFlagStripes(flag, colors, direction) {
     });
 }
 
-function createStatsList(release) {
+function createStatsList(registry, release, refs) {
     const stats = [
-        ['Dimensione dichiarata dalla fonte', formatBytes(release.SizeBytes)],
-        ['Dimensione (effettiva torrent)', '—'],
-        ['Seeders', formatCount(release.Seeders)],
-        ['Leechers', formatCount(release.Leechers)],
-        ['Punteggio', formatCount(release.CompatibilityScore)]
+        ['release.stat.declaredSize', () => formatBytes(release.SizeBytes)],
+        ['release.stat.actualSize', () => (refs.actualSizeBytes > 0 ? formatBytes(refs.actualSizeBytes) : '—')],
+        ['release.stat.seeders', () => formatCount(release.Seeders)],
+        ['release.stat.leechers', () => formatCount(release.Leechers)],
+        ['release.stat.score', () => formatCount(release.CompatibilityScore)]
     ];
 
     const list = createElement('dl', { className: 'tc-stats' });
-    let actualSize = null;
-    for (const [label, value] of stats) {
+    for (const [labelKey, produceValue] of stats) {
         const stat = createElement('div', { className: 'tc-stat' });
-        const displayedValue = createElement('dd', { text: value });
-        if (label === 'Dimensione (effettiva torrent)') {
+        const displayedValue = registry.text(createElement('dd'), produceValue);
+        if (labelKey === 'release.stat.actualSize') {
             displayedValue.classList.add('tc-actual-size');
-            actualSize = displayedValue;
+            refs.actualSize = displayedValue;
         }
 
-        stat.append(createElement('dt', { text: label }), displayedValue);
+        stat.append(createElement('dt', { i18n: labelKey }), displayedValue);
         list.append(stat);
     }
 
-    return { list, actualSize };
+    return list;
 }
 
-function createDetailsPanel(release) {
+function createDetailsPanel(registry, release) {
     const violations = asArray(release.ConstraintsViolated);
     const warnings = asArray(release.Warnings);
     const issueCount = violations.length + warnings.length;
 
     const details = createElement('details', { className: 'tc-details' });
-    const summary = createElement('summary', { className: 'tc-details-summary', text: 'Dettagli tecnici' });
+    const summary = createElement('summary', { className: 'tc-details-summary' });
+    const summaryText = document.createTextNode('');
+    registry.run(() => {
+        summaryText.data = t('release.details.summary');
+    });
+    summary.append(summaryText);
     if (issueCount > 0) {
-        summary.append(createElement('span', {
-            className: 'tc-issue-count',
-            text: issueCount === 1 ? '1 segnalazione' : `${issueCount} segnalazioni`
-        }));
+        summary.append(registry.text(
+            createElement('span', { className: 'tc-issue-count' }),
+            () => t('release.details.issues', { count: issueCount })
+        ));
     }
 
     const content = createElement('div', { className: 'tc-details-content' });
-    appendDetailList(content, 'Vincoli non rispettati', violations.map(translateRule), 'danger');
-    appendDetailList(content, 'Avvisi', warnings.map(translateRule), 'warning');
-    appendDetailList(content, 'Vincoli rispettati', asArray(release.ConstraintsSatisfied).map(translateRule), 'success');
-    appendDetailList(content, 'Preferenze soddisfatte', asArray(release.PreferenceMatches).map(translateRule), 'neutral');
-    appendDetailList(content, 'Tracce audio', asArray(release.AudioTracks).map(describeAudioTrack), 'neutral');
-    appendDetailList(content, 'Tracce sottotitoli', asArray(release.SubtitleTracks).map(describeSubtitleTrack), 'neutral');
+    const addList = (titleKey, produceItems, tone) => appendDetailList(registry, content, titleKey, produceItems, tone);
+    addList('release.details.violated', () => violations.map(translateRule), 'danger');
+    addList('release.details.warnings', () => warnings.map(translateRule), 'warning');
+    addList('release.details.satisfied', () => asArray(release.ConstraintsSatisfied).map(translateRule), 'success');
+    addList('release.details.preferences', () => asArray(release.PreferenceMatches).map(translateRule), 'neutral');
+    addList('release.details.audioTracks', () => asArray(release.AudioTracks).map(describeAudioTrack), 'neutral');
+    addList('release.details.subtitleTracks', () => asArray(release.SubtitleTracks).map(describeSubtitleTrack), 'neutral');
+    addList('release.details.scores', () => {
+        const scores = [
+            t('release.details.compatibility', { value: formatCount(release.CompatibilityScore) }),
+            t('release.details.torrentClaw', { value: String(release.TorrentClawScore ?? '—') })
+        ];
+        if (release.Audio) {
+            scores.push(t('release.details.audioCodec', { value: release.Audio }));
+        }
 
-    const scores = [
-        `Compatibilità: ${formatCount(release.CompatibilityScore)}`,
-        `TorrentClaw: ${release.TorrentClawScore ?? '—'}`
-    ];
-    if (release.Audio) {
-        scores.push(`Codec audio principale: ${release.Audio}`);
-    }
-
-    appendDetailList(content, 'Punteggi e formato', scores, 'neutral');
+        return scores;
+    }, 'neutral');
     details.append(summary, content);
     return details;
 }
 
-function appendDetailList(container, title, items, tone) {
-    if (items.length === 0) {
+/** The items of a list keep their count in every language, so each one is refreshed in place by position. */
+function appendDetailList(registry, container, titleKey, produceItems, tone) {
+    const itemCount = produceItems().length;
+    if (itemCount === 0) {
         return;
     }
 
     const section = createElement('div');
     const list = createElement('ul', { className: 'tc-detail-list', attributes: { 'data-tone': tone } });
-    for (const item of items) {
-        list.append(createElement('li', { text: item }));
+    for (let index = 0; index < itemCount; index += 1) {
+        list.append(createElement('li'));
     }
 
-    section.append(createElement('p', { className: 'tc-detail-title', text: title }), list);
+    registry.run(() => {
+        produceItems().forEach((text, index) => {
+            list.children[index].textContent = text;
+        });
+    });
+    section.append(createElement('p', { className: 'tc-detail-title', i18n: titleKey }), list);
     container.append(section);
 }
 
-function createReleaseFooter(page, release) {
+function createReleaseFooter(page, release, refs) {
     const footer = createElement('div', { className: 'tc-release-footer' });
     const feedbackId = `tcReleaseFeedback-${release.ReleaseId}`;
     const feedback = createElement('p', {
@@ -1127,43 +1282,65 @@ function createReleaseFooter(page, release) {
     });
 
     if (!release.Eligible) {
-        const reasons = asArray(release.ConstraintsViolated).map(translateRule).join(', ');
-        feedback.dataset.tone = 'danger';
-        feedback.textContent = reasons ? `Non idonea: ${reasons}.` : 'Non idonea ai filtri richiesti.';
+        const violations = asArray(release.ConstraintsViolated);
+        refs.ui.feedback = {
+            tone: 'danger',
+            descriptor: violations.length > 0
+                ? message('release.ineligible.reasons', { reasons: () => violations.map(translateRule).join(', ') })
+                : message('release.ineligible.generic')
+        };
     }
 
     const button = createElement('button', {
         className: 'emby-button raised button-submit tc-download-button',
-        text: 'Download',
         attributes: { type: 'button', 'aria-describedby': feedbackId }
     });
     button.disabled = !release.Eligible;
-    button.addEventListener('click', () => openPreflightModal(page, release, button, feedback));
+    button.addEventListener('click', () => openPreflightModal(page, release, refs));
 
     footer.append(feedback, button);
-    return { root: footer, button, feedback };
+    refs.feedback = feedback;
+    refs.downloadButton = button;
+    return footer;
 }
 
-function createCopyMagnetButton(page, release) {
-    const button = createElement('button', {
-        className: 'tc-copy-magnet-button',
-        text: '⧉',
-        attributes: {
-            type: 'button',
-            'aria-label': `Copia magnet di ${release.ReleaseName}`,
-            title: 'Copia magnet'
-        }
-    });
-    button.addEventListener('click', () => handleCopyMagnet(page, release, button));
+function createCopyMagnetButton(page, release, refs) {
+    const button = createElement('button', { className: 'tc-copy-magnet-button', attributes: { type: 'button' } });
+    button.addEventListener('click', () => handleCopyMagnet(release, button, refs));
     return button;
 }
 
-function renderDownloadSent(feedback) {
-    feedback.dataset.tone = 'success';
-    feedback.replaceChildren(
-        createElement('span', { text: 'Inviata a qBittorrent. ' }),
-        createElement('a', { className: 'tc-feedback-link', text: 'Apri i download', attributes: { href: DOWNLOADS_PAGE_URL } })
-    );
+/** Draws the per-release state (feedback, download and copy buttons) in the active language. */
+function renderReleaseState(refs, release, copyButton) {
+    const { ui } = refs;
+    const { feedback } = refs;
+    if (ui.feedback) {
+        feedback.dataset.tone = ui.feedback.tone;
+        const text = resolveMessage(ui.feedback.descriptor);
+        if (ui.feedback.link) {
+            feedback.replaceChildren(
+                createElement('span', { text: `${text} ` }),
+                createElement('a', {
+                    className: 'tc-feedback-link',
+                    text: t(ui.feedback.link.key),
+                    attributes: { href: ui.feedback.link.href }
+                })
+            );
+        } else {
+            feedback.textContent = text;
+        }
+    } else {
+        feedback.replaceChildren();
+        delete feedback.dataset.tone;
+    }
+
+    refs.downloadButton.textContent = t(DOWNLOAD_BUTTON_KEYS[ui.downloadState]);
+    copyButton.textContent = COPY_BUTTON_SYMBOLS[ui.copyState];
+    copyButton.setAttribute('aria-label', t(
+        ui.copyState === 'copied' ? 'release.magnet.copied' : 'release.magnet.label',
+        { name: release.ReleaseName }
+    ));
+    copyButton.setAttribute('title', t('release.magnet.title'));
 }
 
 /* =============================================================================
@@ -1276,7 +1453,7 @@ async function handleSearchSubmit(page, event) {
     state.preferredAudioKeys = parsePreferredLanguageKeys(searchRequest.AudioLanguage, state.configuredAudioLanguage);
     state.preferredSubtitleKeys = parsePreferredLanguageKeys(searchRequest.SubtitleLanguage, state.configuredSubtitleLanguage);
 
-    hideStatus(elements.status);
+    hideStatus(page);
     clearResults(page);
     setSearchBusy(page, true);
     try {
@@ -1286,7 +1463,7 @@ async function handleSearchSubmit(page, event) {
         }
     } catch (error) {
         if (searchGeneration === state.searchGeneration) {
-            showStatus(elements.status, error.message, 'error');
+            showStatus(page, describeError(error), 'error');
         }
     } finally {
         if (searchGeneration === state.searchGeneration) {
@@ -1295,32 +1472,29 @@ async function handleSearchSubmit(page, event) {
     }
 }
 
-async function handleCopyMagnet(page, release, button) {
-    const originalText = button.textContent;
+async function handleCopyMagnet(release, button, refs) {
     button.disabled = true;
-    button.textContent = '…';
+    refs.ui.copyState = 'busy';
+    refs.render();
     try {
         const result = await fetchReleaseMagnet(release.ReleaseId);
         const url = typeof result?.Url === 'string' ? result.Url : '';
         if (url === '') {
-            throw new RequestError('Il magnet della release non è disponibile.', 404);
+            throw new RequestError(message('release.magnet.unavailable'), 404);
         }
 
         await copyToClipboard(url);
-        button.textContent = '✓';
-        button.setAttribute('aria-label', `Magnet copiato per ${release.ReleaseName}`);
+        refs.ui.copyState = 'copied';
     } catch (error) {
-        const refs = page.state.releaseRefs.get(release.ReleaseId);
-        if (refs?.feedback) {
-            refs.feedback.dataset.tone = 'danger';
-            refs.feedback.textContent = `Magnet non copiato. ${error.message}`;
-        }
+        refs.ui.copyState = 'idle';
+        refs.ui.feedback = { tone: 'danger', descriptor: message('release.magnet.failed', { reason: describeError(error) }) };
     } finally {
         button.disabled = false;
+        refs.render();
         window.setTimeout(() => {
             if (button.isConnected) {
-                button.textContent = originalText;
-                button.setAttribute('aria-label', `Copia magnet di ${release.ReleaseName}`);
+                refs.ui.copyState = 'idle';
+                refs.render();
             }
         }, 1500);
     }
@@ -1342,39 +1516,51 @@ async function copyToClipboard(value) {
     const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
     fallback.remove();
     if (!copied) {
-        throw new RequestError('La clipboard di sistema non è disponibile.', 0);
+        throw new RequestError(message('release.magnet.noClipboard'), 0);
     }
 }
 
-async function openPreflightModal(page, release, button, feedback) {
+async function openPreflightModal(page, release, refs) {
     if (page.state.activePreflight) {
-        showStatus(page.elements.status, 'Completa o annulla prima la verifica già aperta.', 'warning');
+        showStatus(page, message('preflight.alreadyOpen'), 'warning');
         return;
     }
 
-    const modal = createPreflightModal(release);
-    const active = { release, button, feedback, modal, ready: false, completed: false };
+    const active = {
+        release,
+        refs,
+        modal: null,
+        ready: false,
+        completed: false,
+        result: null,
+        status: { descriptor: message('preflight.loading'), tone: 'info' }
+    };
+    active.modal = createPreflightModal(page, active);
     page.state.activePreflight = active;
-    button.disabled = true;
-    button.textContent = 'Verifica…';
-    button.setAttribute('aria-busy', 'true');
-    feedback.replaceChildren();
-    delete feedback.dataset.tone;
-    page.view.append(modal.overlay);
-    modal.dialog.focus();
+    refs.downloadButton.disabled = true;
+    refs.downloadButton.setAttribute('aria-busy', 'true');
+    refs.ui.downloadState = 'checking';
+    refs.ui.feedback = null;
+    refs.render();
+    page.view.append(active.modal.overlay);
+    active.modal.dialog.focus();
 
-    modal.cancelButton.addEventListener('click', () => handlePreflightCancel(page, active));
-    modal.retryButton.addEventListener('click', () => handlePreflightRetry(page, active));
-    modal.confirmButton.addEventListener('click', () => handlePreflightConfirm(page, active));
+    active.modal.cancelButton.addEventListener('click', () => handlePreflightCancel(page, active));
+    active.modal.retryButton.addEventListener('click', () => handlePreflightRetry(page, active));
+    active.modal.confirmButton.addEventListener('click', () => handlePreflightConfirm(page, active));
 
     await runPreflight(page, active);
+}
+
+function setPreflightStatus(page, active, descriptor, tone) {
+    active.status = { descriptor, tone };
+    page.state.modalLocalizers.refresh();
 }
 
 async function runPreflight(page, active) {
     const { modal, release } = active;
     active.ready = false;
-    modal.status.dataset.tone = 'info';
-    modal.status.textContent = 'Recupero dei metadati torrent e della dimensione effettiva…';
+    setPreflightStatus(page, active, message('preflight.loading'), 'info');
     modal.retryButton.hidden = true;
     modal.retryButton.disabled = true;
     modal.cancelButton.disabled = true;
@@ -1392,82 +1578,93 @@ async function runPreflight(page, active) {
             return;
         }
 
-        modal.status.dataset.tone = 'danger';
-        modal.status.textContent = `Verifica non riuscita. ${error.message}`;
+        setPreflightStatus(page, active, message('preflight.failed', { reason: describeError(error) }), 'danger');
         modal.cancelButton.disabled = false;
         modal.retryButton.hidden = false;
         modal.retryButton.disabled = false;
     }
 }
 
-function createPreflightModal(release) {
+function createPreflightModal(page, active) {
+    const { release } = active;
+    const registry = page.state.modalLocalizers;
     const titleId = `tcPreflight-${release.ReleaseId}`;
     const overlay = createElement('div', { className: 'tc-preflight-overlay' });
     const dialog = createElement('section', {
         className: 'tc-preflight-modal',
         attributes: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, tabindex: '-1' }
     });
-    const title = createElement('h2', { className: 'tc-preflight-title', text: 'Verifica torrent', attributes: { id: titleId } });
+    const title = createElement('h2', { className: 'tc-preflight-title', i18n: 'preflight.title', attributes: { id: titleId } });
     const releaseName = createElement('p', { className: 'tc-preflight-release', text: release.ReleaseName });
     const status = createElement('p', {
         className: 'tc-preflight-status',
-        text: 'Recupero dei metadati torrent e della dimensione effettiva…',
         attributes: { role: 'status', 'aria-live': 'polite' }
     });
+    registry.run(() => {
+        status.textContent = resolveMessage(active.status.descriptor);
+        status.dataset.tone = active.status.tone;
+    });
+
     const details = createElement('dl', { className: 'tc-preflight-details' });
-    appendPreflightDetail(details, 'Fonte', release.Source || 'Non indicata');
-    appendPreflightDetail(details, 'Seeders', formatCount(release.Seeders));
-    appendPreflightDetail(details, 'Leechers', formatCount(release.Leechers));
-    appendPreflightDetail(details, 'Dimensione dichiarata dalla fonte', formatBytes(release.SizeBytes));
-    const actualSize = appendPreflightDetail(details, 'Dimensione (effettiva torrent)', '—');
-    const limitSize = appendPreflightDetail(details, 'Limite massimo', '—');
+    const addDetail = (labelKey, produceValue) => appendPreflightDetail(registry, details, labelKey, produceValue);
+    addDetail('preflight.source', () => release.Source || t('common.notSpecified'));
+    addDetail('release.stat.seeders', () => formatCount(release.Seeders));
+    addDetail('release.stat.leechers', () => formatCount(release.Leechers));
+    addDetail('release.stat.declaredSize', () => formatBytes(release.SizeBytes));
+    addDetail('release.stat.actualSize', () => (active.result ? formatBytes(active.result.ActualSizeBytes) : '—'));
+    addDetail('preflight.limit', () => {
+        if (!active.result) {
+            return '—';
+        }
+
+        return active.result.MaximumSizeBytes ? formatBytes(active.result.MaximumSizeBytes) : t('common.notSet');
+    });
+
     const actions = createElement('div', { className: 'tc-preflight-actions' });
     const cancelButton = createElement('button', {
         className: 'emby-button raised',
-        text: 'Annulla',
+        i18n: 'preflight.cancel',
         attributes: { type: 'button', disabled: 'disabled' }
     });
     const retryButton = createElement('button', {
         className: 'emby-button raised',
-        text: 'Riprova',
+        i18n: 'preflight.retry',
         attributes: { type: 'button', disabled: 'disabled', hidden: 'hidden' }
     });
     const confirmButton = createElement('button', {
         className: 'emby-button raised button-submit',
-        text: 'Avvia download',
+        i18n: 'preflight.confirm',
         attributes: { type: 'button', disabled: 'disabled' }
     });
     actions.append(cancelButton, retryButton, confirmButton);
     dialog.append(title, releaseName, status, details, actions);
     overlay.append(dialog);
-    return { overlay, dialog, status, actualSize, limitSize, cancelButton, retryButton, confirmButton };
+    return { overlay, dialog, status, cancelButton, retryButton, confirmButton };
 }
 
-function appendPreflightDetail(details, label, value) {
+function appendPreflightDetail(registry, details, labelKey, produceValue) {
     const item = createElement('div', { className: 'tc-preflight-detail' });
-    const displayedValue = createElement('dd', { text: value });
-    item.append(createElement('dt', { text: label }), displayedValue);
+    item.append(createElement('dt', { i18n: labelKey }), registry.text(createElement('dd'), produceValue));
     details.append(item);
-    return displayedValue;
 }
 
 function renderPreflightResult(page, active, result) {
     const { modal } = active;
-    modal.actualSize.textContent = formatBytes(result?.ActualSizeBytes);
-    modal.limitSize.textContent = result?.MaximumSizeBytes ? formatBytes(result.MaximumSizeBytes) : 'Non impostato';
+    active.result = result ?? {};
     updateActualSize(page, active.release.ReleaseId, result?.ActualSizeBytes);
 
     if (isPreflightReady(result)) {
         active.ready = true;
-        modal.status.dataset.tone = 'success';
-        modal.status.textContent = 'Dimensione verificata. Conferma per avviare il download.';
+        setPreflightStatus(page, active, message('preflight.ready'), 'success');
         modal.confirmButton.disabled = false;
         modal.cancelButton.disabled = false;
         return;
     }
 
-    modal.status.dataset.tone = 'danger';
-    modal.status.textContent = result?.Message || 'I metadati torrent non sono disponibili.';
+    const problem = result?.Message
+        ? message('common.text', { text: String(result.Message) })
+        : message('preflight.metadataUnavailable');
+    setPreflightStatus(page, active, problem, 'danger');
     modal.cancelButton.disabled = false;
     if (isMetadataUnavailable(result)) {
         modal.retryButton.hidden = false;
@@ -1486,6 +1683,7 @@ function isMetadataUnavailable(result) {
 function updateActualSize(page, releaseId, sizeBytes) {
     const refs = page.state.releaseRefs.get(releaseId);
     if (refs?.actualSize && typeof sizeBytes === 'number' && sizeBytes > 0) {
+        refs.actualSizeBytes = sizeBytes;
         refs.actualSize.textContent = formatBytes(sizeBytes);
     }
 }
@@ -1495,19 +1693,23 @@ async function handlePreflightConfirm(page, active) {
         return;
     }
 
-    const { modal } = active;
+    const { modal, refs } = active;
     modal.confirmButton.disabled = true;
     modal.cancelButton.disabled = true;
-    modal.status.textContent = 'Avvio del download…';
+    setPreflightStatus(page, active, message('preflight.starting'), 'info');
     try {
         await confirmPreflight(active.release.ReleaseId);
         active.completed = true;
-        active.button.textContent = 'Inviata ✓';
-        renderDownloadSent(active.feedback);
+        refs.ui.downloadState = 'sent';
+        refs.ui.feedback = {
+            tone: 'success',
+            descriptor: message('release.sent.text'),
+            link: { key: 'release.sent.link', href: DOWNLOADS_PAGE_URL }
+        };
+        refs.render();
         closePreflightModal(page, active, { restoreButton: false });
     } catch (error) {
-        modal.status.dataset.tone = 'danger';
-        modal.status.textContent = `Download non avviato. ${error.message}`;
+        setPreflightStatus(page, active, message('preflight.startFailed', { reason: describeError(error) }), 'danger');
         modal.confirmButton.disabled = false;
         modal.cancelButton.disabled = false;
     }
@@ -1536,8 +1738,7 @@ async function handlePreflightCancel(page, active) {
 
         closePreflightModal(page, active, { restoreButton: true });
     } catch (error) {
-        modal.status.dataset.tone = 'danger';
-        modal.status.textContent = `Annullamento non riuscito. ${error.message}`;
+        setPreflightStatus(page, active, message('preflight.cancelFailed', { reason: describeError(error) }), 'danger');
         modal.cancelButton.disabled = false;
     }
 }
@@ -1549,11 +1750,13 @@ function closePreflightModal(page, active, { restoreButton }) {
 
     active.modal.overlay.remove();
     page.state.activePreflight = null;
-    active.button.removeAttribute('aria-busy');
+    page.state.modalLocalizers.clear();
+    active.refs.downloadButton.removeAttribute('aria-busy');
     if (restoreButton) {
-        active.button.disabled = false;
-        active.button.textContent = 'Download';
-        active.button.focus();
+        active.refs.ui.downloadState = 'idle';
+        active.refs.render();
+        active.refs.downloadButton.disabled = false;
+        active.refs.downloadButton.focus();
     }
 }
 
@@ -1566,7 +1769,7 @@ function handleFormInput(page, event) {
     ]);
     const errorElement = errorByInput.get(event.target);
     if (errorElement) {
-        setFieldError(event.target, errorElement, null);
+        setFieldError(page, event.target, errorElement, null);
     }
 
     renderActiveFilters(page);
@@ -1610,7 +1813,7 @@ async function loadSearchDefaults(page) {
         elements.preferRemux.checked = Boolean(configuration.PreferRemux);
         renderActiveFilters(page);
     } catch (error) {
-        showStatus(elements.status, `Filtri predefiniti non caricati. ${error.message}`, 'warning');
+        showStatus(page, message('search.error.defaultsFailed', { reason: describeError(error) }), 'warning');
     }
 }
 
@@ -1644,22 +1847,38 @@ function handleViewDestroy(page) {
     if (active && !active.completed) {
         active.modal.overlay.remove();
         page.state.activePreflight = null;
+        page.state.modalLocalizers.clear();
         void cancelPreflight(active.release.ReleaseId).catch(() => {});
     }
 
     page.state.searchGeneration += 1;
     resetPosterLoading(page);
     page.state.posterObserver = null;
+    page.state.unsubscribeLanguage?.();
+    page.state.resultLocalizers.clear();
     page.state.lifetime.abort();
 }
 
-export default function SearchPageController(view) {
+function initializePage(view) {
     const page = { view, elements: queryPageElements(view), state: createPageState() };
     const listenerOptions = { signal: page.state.lifetime.signal };
 
+    // Translation runs before any asynchronous rendering. Later language changes only update texts in place.
+    translatePage(view);
+    bindLanguagePicker(view, { signal: page.state.lifetime.signal });
+    page.state.unsubscribeLanguage = onLanguageChange(() => renderLanguage(page));
     bindEventHandlers(page);
     renderActiveFilters(page);
     view.addEventListener('viewshow', () => handleViewShow(page), listenerOptions);
     view.addEventListener('viewhide', () => handleViewHide(page), listenerOptions);
     view.addEventListener('viewdestroy', () => handleViewDestroy(page), { once: true });
+
+    // The view may already be on screen: its "viewshow" event can have fired while the module was loading.
+    if (!view.classList.contains('hide')) {
+        handleViewShow(page);
+    }
+}
+
+export default function SearchPageController(view) {
+    i18nReady.then(() => initializePage(view));
 }

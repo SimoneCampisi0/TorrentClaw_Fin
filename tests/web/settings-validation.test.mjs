@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { getNumberError, getUrlError } from '../../src/Jellyfin.Plugin.TorrentClaw/Web/Settings/settings.js';
+import { getNumberError, getUrlError, i18nReady } from '../../src/Jellyfin.Plugin.TorrentClaw/Web/Settings/settings.js';
+import { resolveMessage, setLanguage } from '../../src/Jellyfin.Plugin.TorrentClaw/Web/Shared/torrentclaw-i18n.js';
+
+await i18nReady;
 
 test('TorrentClaw URL validation matches the server: HTTPS only, no credentials', () => {
     const rule = { required: true, httpsOnly: true };
@@ -35,4 +38,34 @@ test('numeric validation uses the server ranges', () => {
     assert.equal(getNumberError('', maxSize), null);
     assert.equal(getNumberError('12.5', maxSize), null);
     assert.notEqual(getNumberError('-1', maxSize), null);
+});
+
+test('validation messages are rendered in the active UI language', () => {
+    const httpsOnly = { required: true, httpsOnly: true };
+    const timeout = { min: 1, max: 120, integerOnly: true, allowEmpty: false };
+    const problems = () => [
+        getUrlError('', httpsOnly),
+        getUrlError('http://torrentclaw.com', httpsOnly),
+        getNumberError('500', timeout),
+        getNumberError('1.5', timeout)
+    ];
+
+    setLanguage('en');
+    assert.deepEqual(problems().map(resolveMessage), [
+        'This field is required.',
+        'Only HTTPS is allowed.',
+        'Enter a value between 1 and 120.',
+        'Enter a whole number.'
+    ]);
+
+    // The same descriptors, kept from before the change, are shown in the new language.
+    const kept = problems();
+    setLanguage('it');
+    assert.deepEqual(kept.map(resolveMessage), [
+        'Campo obbligatorio.',
+        'È consentito solo HTTPS.',
+        'Inserisci un valore tra 1 e 120.',
+        'Inserisci un numero intero.'
+    ]);
+    setLanguage('en');
 });

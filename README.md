@@ -16,6 +16,7 @@ It is designed for administrators who want the search, selection, download monit
 - Background qBittorrent monitoring and a Jellyfin library refresh request after a completed download.
 - Server-side poster proxy and bounded cache.
 - Secret-preserving configuration API: read operations expose configuration status, not API keys or passwords.
+- English and Italian interface, selectable from the flag picker in every page header (see Interface language).
 
 ## Important notice
 
@@ -122,6 +123,12 @@ These preferences populate the Search page. Administrators can adjust the filter
 7. When it completes, confirm that Jellyfin has refreshed the target library.
 
 Removing an entry from TorrentClaw - Downloads removes the associated torrent from qBittorrent but intentionally leaves downloaded files on disk. Delete or archive media through your normal library-management process.
+
+## Interface language
+
+The Search, Downloads, and Settings pages are shown in English by default. Use the flag picker at the top right of any page to switch to Italian (or back to English): the whole page, including its navigation, dates, numbers, and sizes, changes immediately without losing your inputs, search results, or download state.
+
+The choice is a per-browser-session preference kept in the browser's session storage, so it survives refreshes and applies to all three pages until the browser session ends. It is not a server setting, does not change the Jellyfin language, and is not stored in the plugin configuration. Audio and subtitle preferences keep their codes; only their labels change with the interface language. The page names in the Jellyfin dashboard menu are provided by the server and stay in Italian.
 
 ## Security and privacy
 

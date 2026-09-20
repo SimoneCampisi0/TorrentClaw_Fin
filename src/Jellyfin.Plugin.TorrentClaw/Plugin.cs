@@ -11,6 +11,8 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public const string SearchPageName = "TorrentClawSearch";
     public const string DownloadsPageName = "TorrentClawDownloads";
     public const string SettingsPageName = "TorrentClawSettings";
+    public const string SharedI18nAssetName = "TorrentClawI18n.js";
+    public const string SharedStylesAssetName = "TorrentClawShared.css";
     private const string ResourcePrefix = "Jellyfin.Plugin.TorrentClaw.Web";
 
     public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
@@ -31,7 +33,8 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public IEnumerable<PluginPageInfo> GetPages() => CreatePages();
 
     /// <summary>
-    /// Three menu pages plus their stylesheet and script. Jellyfin serves every entry through
+    /// Three menu pages plus their stylesheet and script, and the i18n module and stylesheet they share
+    /// (the language picker and translations). Jellyfin serves every entry through
     /// <c>web/ConfigurationPage?name=...</c>; page names are prefixed because they are global across plugins.
     /// The Search page is listed first because the dashboard plugin card opens the first menu page.
     /// </summary>
@@ -45,7 +48,9 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         CreateAssetPage(DownloadsPageName + ".js", "Downloads.downloads.js"),
         CreateAssetPage(DownloadsPageName + ".css", "Downloads.downloads.css"),
         CreateAssetPage(SettingsPageName + ".js", "Settings.settings.js"),
-        CreateAssetPage(SettingsPageName + ".css", "Settings.settings.css")
+        CreateAssetPage(SettingsPageName + ".css", "Settings.settings.css"),
+        CreateAssetPage(SharedI18nAssetName, "Shared.torrentclaw-i18n.js"),
+        CreateAssetPage(SharedStylesAssetName, "Shared.torrentclaw-shared.css")
     ];
 
     private static PluginPageInfo CreateMenuPage(string name, string displayName, string icon, string resource) => new()

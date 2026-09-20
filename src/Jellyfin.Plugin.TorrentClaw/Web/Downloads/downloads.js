@@ -9,6 +9,34 @@
  * Constants
  * ========================================================================== */
 
+// The shared module is served as a plugin asset next to this page, so it is resolved against the page URL
+// (and therefore honours a Jellyfin base path). In Node tests it is imported from the source tree.
+const I18N_ASSET_PATH = 'configurationpage?name=TorrentClawI18n.js';
+
+async function loadI18n() {
+    if (typeof window === 'undefined') {
+        return import('../Shared/torrentclaw-i18n.js');
+    }
+
+    return import(new URL(I18N_ASSET_PATH, window.location.href).href);
+}
+
+// Jellyfin loads a controller through a blob script whose "load" event fires before a module with top-level await
+// has finished evaluating, so the module must not await anything at the top level. The page is initialised
+// when the shared module is ready instead (tests await i18nReady before calling the exported helpers).
+let i18n = null;
+export const i18nReady = loadI18n().then(module => {
+    i18n = module;
+});
+
+const bindLanguagePicker = (...args) => i18n.bindLanguagePicker(...args);
+const getLocale = (...args) => i18n.getLocale(...args);
+const message = (...args) => i18n.message(...args);
+const onLanguageChange = (...args) => i18n.onLanguageChange(...args);
+const resolveMessage = (...args) => i18n.resolveMessage(...args);
+const t = (...args) => i18n.t(...args);
+const translatePage = (...args) => i18n.translatePage(...args);
+
 const ENDPOINTS = Object.freeze({
     downloads: 'TorrentClaw/Downloads',
     pauseTemplate: 'TorrentClaw/Downloads/{id}/Pause',
@@ -34,30 +62,31 @@ const STATE_NAMES_BY_INDEX = Object.freeze([
     'MissingFiles'
 ]);
 
+// States are stable data; their labels ("downloads.state.<name>") are resolved when rendered.
 const DOWNLOAD_STATES = Object.freeze({
-    Waiting: { label: 'In attesa di stato', symbol: '…', tone: 'neutral', canPause: false, canResume: false },
-    Unknown: { label: 'Stato sconosciuto', symbol: '?', tone: 'neutral', canPause: false, canResume: false },
-    Queued: { label: 'In coda', symbol: '⋯', tone: 'info', canPause: true, canResume: false },
-    Downloading: { label: 'In download', symbol: '↓', tone: 'active', canPause: true, canResume: false },
-    Paused: { label: 'In pausa', symbol: '❚❚', tone: 'neutral', canPause: false, canResume: true },
-    Stalled: { label: 'Bloccato', symbol: '!', tone: 'warning', canPause: true, canResume: false },
-    Checking: { label: 'In verifica', symbol: '↻', tone: 'info', canPause: false, canResume: false },
-    Completed: { label: 'Completato', symbol: '✓', tone: 'success', canPause: false, canResume: false },
-    Error: { label: 'Errore', symbol: '✕', tone: 'danger', canPause: false, canResume: true },
-    MissingFiles: { label: 'File mancanti', symbol: '✕', tone: 'danger', canPause: false, canResume: true }
+    Waiting: { symbol: '…', tone: 'neutral', canPause: false, canResume: false },
+    Unknown: { symbol: '?', tone: 'neutral', canPause: false, canResume: false },
+    Queued: { symbol: '⋯', tone: 'info', canPause: true, canResume: false },
+    Downloading: { symbol: '↓', tone: 'active', canPause: true, canResume: false },
+    Paused: { symbol: '❚❚', tone: 'neutral', canPause: false, canResume: true },
+    Stalled: { symbol: '!', tone: 'warning', canPause: true, canResume: false },
+    Checking: { symbol: '↻', tone: 'info', canPause: false, canResume: false },
+    Completed: { symbol: '✓', tone: 'success', canPause: false, canResume: false },
+    Error: { symbol: '✕', tone: 'danger', canPause: false, canResume: true },
+    MissingFiles: { symbol: '✕', tone: 'danger', canPause: false, canResume: true }
 });
 
-const CONTENT_TYPE_LABELS = Object.freeze({
-    Movie: 'Film',
-    Show: 'Serie TV',
-    0: 'Film',
-    1: 'Serie TV'
+const CONTENT_TYPE_LABEL_KEYS = Object.freeze({
+    Movie: 'downloads.type.movie',
+    Show: 'downloads.type.show',
+    0: 'downloads.type.movie',
+    1: 'downloads.type.show'
 });
 
-const ACTION_SUCCESS_MESSAGES = Object.freeze({
-    pause: 'Pausa richiesta a qBittorrent. Lo stato si aggiornerà al prossimo controllo del server.',
-    resume: 'Ripresa richiesta a qBittorrent. Lo stato si aggiornerà al prossimo controllo del server.',
-    remove: 'Torrent rimosso da qBittorrent. I file scaricati sono stati conservati.'
+const ACTION_SUCCESS_KEYS = Object.freeze({
+    pause: 'downloads.action.pauseDone',
+    resume: 'downloads.action.resumeDone',
+    remove: 'downloads.action.removeDone'
 });
 
 /* =============================================================================
@@ -78,6 +107,17 @@ function createElement(tagName, options = {}) {
         element.textContent = String(options.text);
     }
 
+    // Static texts are marked with data-i18n, so translatePage() keeps them in the active language.
+    if (options.i18n) {
+        element.setAttribute('data-i18n', options.i18n);
+        element.textContent = t(options.i18n);
+    }
+
+    for (const [name, key] of Object.entries(options.i18nAttributes ?? {})) {
+        element.setAttribute(name, t(key));
+        element.setAttribute('data-i18n-attr', `${name}:${key}`);
+    }
+
     for (const [name, value] of Object.entries(options.attributes ?? {})) {
         element.setAttribute(name, String(value));
     }
@@ -85,22 +125,40 @@ function createElement(tagName, options = {}) {
     return element;
 }
 
-function showStatus(statusElement, message, tone = 'info') {
-    statusElement.textContent = message;
-    statusElement.dataset.tone = tone;
-    statusElement.hidden = false;
+function renderStatus(page) {
+    const { elements, state } = page;
+    if (!state.status) {
+        elements.status.hidden = true;
+        elements.status.textContent = '';
+        return;
+    }
+
+    elements.status.textContent = resolveMessage(state.status.descriptor);
+    elements.status.dataset.tone = state.status.tone;
+    elements.status.hidden = false;
 }
 
-function hideStatus(statusElement) {
-    statusElement.hidden = true;
-    statusElement.textContent = '';
+/** Shows a message that is kept as a descriptor, so it can be shown again in another language. */
+function showStatus(page, descriptor, tone = 'info') {
+    page.state.status = { descriptor, tone };
+    renderStatus(page);
+}
+
+function hideStatus(page) {
+    page.state.status = null;
+    renderStatus(page);
+}
+
+/** Message shown for a failed request; anything that is not a RequestError gets a generic text. */
+function describeError(error) {
+    return error?.descriptor ?? message('error.generic');
 }
 
 /* =============================================================================
  * Formatting
  * ========================================================================== */
 
-function formatBytes(bytes) {
+export function formatBytes(bytes) {
     if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
         return '—';
     }
@@ -114,7 +172,7 @@ function formatBytes(bytes) {
     }
 
     const decimals = unitIndex === 0 ? 0 : unitIndex >= 3 ? 2 : 1;
-    const formatted = value.toLocaleString('it-IT', {
+    const formatted = value.toLocaleString(getLocale(), {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     });
@@ -125,26 +183,26 @@ function formatSpeed(bytesPerSecond) {
     return `${formatBytes(bytesPerSecond)}/s`;
 }
 
-function formatPercent(percent) {
-    return `${percent.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+export function formatPercent(percent) {
+    return `${percent.toLocaleString(getLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-function formatDuration(totalSeconds) {
+export function formatDuration(totalSeconds) {
     if (totalSeconds < 60) {
-        return `${Math.max(1, Math.round(totalSeconds))} s`;
+        return t('downloads.duration.seconds', { n: Math.max(1, Math.round(totalSeconds)) });
     }
 
     const minutes = Math.floor(totalSeconds / 60);
     if (minutes < 60) {
-        return `${minutes} min`;
+        return t('downloads.duration.minutes', { n: minutes });
     }
 
     const hours = Math.floor(minutes / 60);
     if (hours < 24) {
-        return `${hours} h ${minutes % 60} min`;
+        return t('downloads.duration.hours', { h: hours, m: minutes % 60 });
     }
 
-    return `${Math.floor(hours / 24)} g ${hours % 24} h`;
+    return t('downloads.duration.days', { d: Math.floor(hours / 24), h: hours % 24 });
 }
 
 function formatEta(status, stateName) {
@@ -154,14 +212,14 @@ function formatEta(status, stateName) {
 
     const seconds = Number(status.EtaSeconds);
     if (!Number.isFinite(seconds) || seconds < 0 || seconds >= UNKNOWN_ETA_SECONDS) {
-        return 'Non stimabile';
+        return t('downloads.card.etaUnknown');
     }
 
     return formatDuration(seconds);
 }
 
 function formatTime(date) {
-    return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return date.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function formatDateTime(value) {
@@ -170,7 +228,7 @@ function formatDateTime(value) {
         return '—';
     }
 
-    return date.toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleString(getLocale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 export function resolveStateName(status) {
@@ -186,14 +244,25 @@ export function resolveStateName(status) {
     return Object.hasOwn(DOWNLOAD_STATES, rawState) ? rawState : 'Unknown';
 }
 
+/** Label of a download state in the active UI language. */
+export function getStateLabel(stateName) {
+    return t(`downloads.state.${Object.hasOwn(DOWNLOAD_STATES, stateName) ? stateName : 'Unknown'}`);
+}
+
 function describeSummary(items) {
+    if (items === null) {
+        return message('downloads.summary.loading');
+    }
+
     if (items.length === 0) {
-        return 'Nessun download monitorato';
+        return message('downloads.summary.none');
     }
 
     const activeCount = items.filter(item => resolveStateName(item.Status) === 'Downloading').length;
-    const totalText = items.length === 1 ? '1 download monitorato' : `${items.length} download monitorati`;
-    return `${totalText} · ${activeCount} in corso`;
+    return message('downloads.summary.withActive', {
+        total: message('downloads.summary.total', { count: items.length }),
+        active: activeCount
+    });
 }
 
 /* =============================================================================
@@ -201,9 +270,10 @@ function describeSummary(items) {
  * ========================================================================== */
 
 class RequestError extends Error {
-    constructor(message, status) {
-        super(message);
+    constructor(descriptor, status) {
+        super(descriptor.key);
         this.name = 'RequestError';
+        this.descriptor = descriptor;
         this.status = status;
     }
 }
@@ -232,7 +302,7 @@ async function toRequestError(failure) {
     }
 
     if (!failure || typeof failure.status !== 'number') {
-        return new RequestError('Impossibile contattare il server Jellyfin. Controlla la connessione e riprova.', 0);
+        return new RequestError(message('error.network'), 0);
     }
 
     const problem = await readProblemDetails(failure);
@@ -250,22 +320,22 @@ async function readProblemDetails(response) {
 
 function describeFailure(status, problem) {
     if (problem?.title && problem?.detail) {
-        return `${problem.title}. ${problem.detail}`;
+        return message('common.reason', { title: problem.title, detail: problem.detail });
     }
 
     if (status === 401 || status === 403) {
-        return 'Sessione scaduta o permessi insufficienti: accedi di nuovo come amministratore.';
+        return message('error.unauthorized');
     }
 
     if (status === 404) {
-        return 'Il download non è più monitorato. Aggiorna l\'elenco.';
+        return message('downloads.error.notFound');
     }
 
     if (status >= 500) {
-        return 'Il server ha riscontrato un errore imprevisto. Riprova più tardi.';
+        return message('error.server');
     }
 
-    return 'La richiesta non è andata a buon fine. Riprova.';
+    return message('error.generic');
 }
 
 function fetchDownloads() {
@@ -282,7 +352,7 @@ function sendDownloadAction(downloadId, action) {
         case 'remove':
             return requestWithoutContent(ENDPOINTS.removeTemplate.replace('{id}', encodedId), { method: 'DELETE' });
         default:
-            return Promise.reject(new RequestError('Azione non supportata.', 0));
+            return Promise.reject(new RequestError(message('downloads.action.unsupported'), 0));
     }
 }
 
@@ -402,7 +472,12 @@ function createPageState() {
         cards: new Map(),
         busyDownloadIds: new Set(),
         pendingRemovalId: null,
-        hasLoadError: false
+        hasLoadError: false,
+        // Language-independent state, kept so the visible texts can be rendered again when the language changes.
+        items: null,
+        lastUpdatedAt: null,
+        status: null,
+        unsubscribeLanguage: null
     };
 }
 
@@ -443,7 +518,33 @@ function renderDownloads(page, items) {
     });
 
     elements.emptyState.hidden = items.length > 0;
-    elements.summary.textContent = describeSummary(items);
+    state.items = items;
+    renderSummary(page);
+}
+
+function renderSummary(page) {
+    page.elements.summary.textContent = resolveMessage(describeSummary(page.state.items));
+}
+
+function renderLastUpdated(page) {
+    const { lastUpdatedAt } = page.state;
+    const seconds = REFRESH_INTERVAL_MS / 1000;
+    page.elements.lastUpdated.textContent = lastUpdatedAt
+        ? t('downloads.toolbar.updated', { time: formatTime(lastUpdatedAt), seconds })
+        : t('downloads.toolbar.autoRefresh', { seconds });
+}
+
+/** Refreshes every text that is not covered by data-i18n markers, without rebuilding any card. */
+function renderLanguage(page) {
+    translatePage(page.view);
+    renderSummary(page);
+    renderLastUpdated(page);
+    renderStatus(page);
+    for (const card of page.state.cards.values()) {
+        if (card.item) {
+            updateDownloadCard(page, card);
+        }
+    }
 }
 
 function createDownloadCard(page, downloadId) {
@@ -465,7 +566,8 @@ function createDownloadCard(page, downloadId) {
     const progress = createElement('div', { className: 'tc-progress' });
     const progressTrack = createElement('div', {
         className: 'tc-progress-track',
-        attributes: { role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-label': 'Avanzamento' }
+        i18nAttributes: { 'aria-label': 'downloads.card.progress' },
+        attributes: { role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100 }
     });
     const progressFill = createElement('div', { className: 'tc-progress-fill' });
     const progressValue = createElement('span', { className: 'tc-progress-value', attributes: { 'aria-hidden': 'true' } });
@@ -473,31 +575,28 @@ function createDownloadCard(page, downloadId) {
     progress.append(progressTrack, progressValue);
 
     const stats = createElement('dl', { className: 'tc-download-stats' });
-    const downloadedValue = appendStat(stats, 'Scaricato');
-    const speedValue = appendStat(stats, 'Velocità');
-    const etaValue = appendStat(stats, 'Tempo stimato');
+    const downloadedValue = appendStat(stats, 'downloads.card.downloaded');
+    const speedValue = appendStat(stats, 'downloads.card.speed');
+    const etaValue = appendStat(stats, 'downloads.card.eta');
 
     const libraryNote = createElement('p', {
         className: 'tc-download-note',
-        text: '✓ Aggiornamento della libreria Jellyfin richiesto',
+        i18n: 'downloads.card.libraryRefresh',
         attributes: { 'data-tone': 'success' }
     });
     const errorNote = createElement('p', { className: 'tc-download-note', attributes: { 'data-tone': 'danger' } });
 
     const actions = createElement('div', { className: 'tc-download-actions' });
-    const pauseButton = createActionButton('Pausa');
-    const resumeButton = createActionButton('Riprendi');
-    const removeButton = createActionButton('Rimuovi', 'tc-action-danger');
+    const pauseButton = createActionButton('downloads.action.pause');
+    const resumeButton = createActionButton('downloads.action.resume');
+    const removeButton = createActionButton('downloads.action.remove', 'tc-action-danger');
     actions.append(pauseButton, resumeButton, removeButton);
 
     const confirmation = createElement('div', { className: 'tc-removal-confirmation' });
-    const cancelButton = createActionButton('Annulla');
-    const confirmButton = createActionButton('Conferma rimozione', 'tc-action-danger-solid');
+    const cancelButton = createActionButton('downloads.action.cancel');
+    const confirmButton = createActionButton('downloads.action.confirmRemoval', 'tc-action-danger-solid');
     confirmation.append(
-        createElement('p', {
-            className: 'tc-removal-question',
-            text: 'Rimuovere il torrent da qBittorrent? I file scaricati restano sul disco.'
-        }),
+        createElement('p', { className: 'tc-removal-question', i18n: 'downloads.action.removalQuestion' }),
         cancelButton,
         confirmButton
     );
@@ -536,18 +635,18 @@ function createDownloadCard(page, downloadId) {
     };
 }
 
-function createActionButton(label, extraClassName = '') {
+function createActionButton(labelKey, extraClassName = '') {
     return createElement('button', {
         className: `emby-button raised tc-action-button ${extraClassName}`.trim(),
-        text: label,
+        i18n: labelKey,
         attributes: { type: 'button' }
     });
 }
 
-function appendStat(list, label) {
+function appendStat(list, labelKey) {
     const stat = createElement('div', { className: 'tc-download-stat' });
     const value = createElement('dd', { text: '—' });
-    stat.append(createElement('dt', { text: label }), value);
+    stat.append(createElement('dt', { i18n: labelKey }), value);
     list.append(stat);
     return value;
 }
@@ -562,28 +661,31 @@ function updateDownloadCard(page, card) {
     card.root.dataset.state = stateName;
     card.root.dataset.tone = descriptor.tone;
     refs.title.textContent = item.ReleaseName;
-    refs.meta.textContent = `${CONTENT_TYPE_LABELS[item.ContentType] ?? 'Contenuto'} · aggiunto ${formatDateTime(item.CreatedAt)}`;
+    refs.meta.textContent = t('downloads.card.meta', {
+        type: t(CONTENT_TYPE_LABEL_KEYS[item.ContentType] ?? 'downloads.type.other'),
+        date: formatDateTime(item.CreatedAt)
+    });
     refs.badgeSymbol.textContent = descriptor.symbol;
-    refs.badgeText.textContent = descriptor.label;
+    refs.badgeText.textContent = getStateLabel(stateName);
 
     refs.progressTrack.setAttribute('aria-valuenow', progressPercent.toFixed(1));
-    refs.progressTrack.setAttribute('aria-valuetext', `${formatPercent(progressPercent)} completato`);
+    refs.progressTrack.setAttribute('aria-valuetext', t('downloads.card.progressText', { percent: formatPercent(progressPercent) }));
     refs.progressFill.style.setProperty('--tc-progress', `${progressPercent}%`);
     refs.progressValue.textContent = formatPercent(progressPercent);
 
     refs.downloadedValue.textContent = status
-        ? `${formatBytes(status.DownloadedBytes)} di ${formatBytes(status.TotalBytes)}`
+        ? t('downloads.card.downloadedOf', { done: formatBytes(status.DownloadedBytes), total: formatBytes(status.TotalBytes) })
         : '—';
     refs.speedValue.textContent = status ? formatSpeed(status.DownloadSpeed) : '—';
     refs.etaValue.textContent = formatEta(status, stateName);
 
     refs.libraryNote.hidden = !item.LibraryRefreshRequested;
     refs.errorNote.hidden = !status?.Error;
-    refs.errorNote.textContent = status?.Error ? `qBittorrent segnala: ${status.Error}` : '';
+    refs.errorNote.textContent = status?.Error ? t('downloads.card.clientError', { error: status.Error }) : '';
 
-    refs.pauseButton.setAttribute('aria-label', `Metti in pausa ${item.ReleaseName}`);
-    refs.resumeButton.setAttribute('aria-label', `Riprendi ${item.ReleaseName}`);
-    refs.removeButton.setAttribute('aria-label', `Rimuovi ${item.ReleaseName} da qBittorrent`);
+    refs.pauseButton.setAttribute('aria-label', t('downloads.action.pauseLabel', { name: item.ReleaseName }));
+    refs.resumeButton.setAttribute('aria-label', t('downloads.action.resumeLabel', { name: item.ReleaseName }));
+    refs.removeButton.setAttribute('aria-label', t('downloads.action.removeLabel', { name: item.ReleaseName }));
     updateCardActions(page, card);
 }
 
@@ -618,14 +720,15 @@ async function refreshDownloads(page) {
     try {
         const items = await fetchDownloads();
         renderDownloads(page, Array.isArray(items) ? items : []);
-        elements.lastUpdated.textContent = `Aggiornato alle ${formatTime(new Date())} · aggiornamento automatico ogni ${REFRESH_INTERVAL_MS / 1000} secondi.`;
+        state.lastUpdatedAt = new Date();
+        renderLastUpdated(page);
         if (state.hasLoadError) {
             state.hasLoadError = false;
-            hideStatus(elements.status);
+            hideStatus(page);
         }
     } catch (error) {
         state.hasLoadError = true;
-        showStatus(elements.status, `Elenco non aggiornato. ${error.message}`, 'error');
+        showStatus(page, message('downloads.error.listFailed', { reason: describeError(error) }), 'error');
     } finally {
         elements.loadingState.hidden = true;
     }
@@ -642,7 +745,7 @@ async function handleRefreshClick(page) {
 }
 
 async function handleDownloadAction(page, downloadId, action) {
-    const { elements, state } = page;
+    const { state } = page;
     if (state.busyDownloadIds.has(downloadId)) {
         return;
     }
@@ -655,9 +758,9 @@ async function handleDownloadAction(page, downloadId, action) {
             state.pendingRemovalId = null;
         }
 
-        showStatus(elements.status, ACTION_SUCCESS_MESSAGES[action], 'success');
+        showStatus(page, message(ACTION_SUCCESS_KEYS[action]), 'success');
     } catch (error) {
-        showStatus(elements.status, error.message, 'error');
+        showStatus(page, describeError(error), 'error');
     } finally {
         state.busyDownloadIds.delete(downloadId);
         refreshCardActions(page, downloadId);
@@ -703,11 +806,12 @@ function handleViewHide(page) {
 
 function handleViewDestroy(page) {
     page.poller.stop();
+    page.state.unsubscribeLanguage?.();
     page.state.lifetime.abort();
     page.state.cards.clear();
 }
 
-export default function DownloadsPageController(view) {
+function initializePage(view) {
     const page = {
         view,
         elements: queryPageElements(view),
@@ -720,8 +824,21 @@ export default function DownloadsPageController(view) {
     });
 
     const listenerOptions = { signal: page.state.lifetime.signal };
+    // Translation runs before the first (asynchronous) render; later changes only update texts in place.
+    renderLanguage(page);
+    bindLanguagePicker(view, { signal: page.state.lifetime.signal });
+    page.state.unsubscribeLanguage = onLanguageChange(() => renderLanguage(page));
     page.elements.refreshButton.addEventListener('click', () => handleRefreshClick(page), listenerOptions);
     view.addEventListener('viewshow', () => handleViewShow(page), listenerOptions);
     view.addEventListener('viewhide', () => handleViewHide(page), listenerOptions);
     view.addEventListener('viewdestroy', () => handleViewDestroy(page), { once: true });
+
+    // The view may already be on screen: its "viewshow" event can have fired while the module was loading.
+    if (!view.classList.contains('hide')) {
+        handleViewShow(page);
+    }
+}
+
+export default function DownloadsPageController(view) {
+    i18nReady.then(() => initializePage(view));
 }

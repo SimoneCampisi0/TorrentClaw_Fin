@@ -12,6 +12,33 @@
  * Constants
  * ========================================================================== */
 
+// The shared module is served as a plugin asset next to this page, so it is resolved against the page URL
+// (and therefore honours a Jellyfin base path). In Node tests it is imported from the source tree.
+const I18N_ASSET_PATH = 'configurationpage?name=TorrentClawI18n.js';
+
+async function loadI18n() {
+    if (typeof window === 'undefined') {
+        return import('../Shared/torrentclaw-i18n.js');
+    }
+
+    return import(new URL(I18N_ASSET_PATH, window.location.href).href);
+}
+
+// Jellyfin loads a controller through a blob script whose "load" event fires before a module with top-level await
+// has finished evaluating, so the module must not await anything at the top level. The page is initialised
+// when the shared module is ready instead (tests await i18nReady before calling the exported helpers).
+let i18n = null;
+export const i18nReady = loadI18n().then(module => {
+    i18n = module;
+});
+
+const bindLanguagePicker = (...args) => i18n.bindLanguagePicker(...args);
+const getLocale = (...args) => i18n.getLocale(...args);
+const message = (...args) => i18n.message(...args);
+const onLanguageChange = (...args) => i18n.onLanguageChange(...args);
+const resolveMessage = (...args) => i18n.resolveMessage(...args);
+const translatePage = (...args) => i18n.translatePage(...args);
+
 const ENDPOINTS = Object.freeze({
     configuration: 'TorrentClaw/Configuration',
     testTorrentClaw: 'TorrentClaw/Connections/TorrentClaw/Test',
@@ -46,28 +73,29 @@ const FIELD_RULES = Object.freeze([
     { id: 'tcPreferRemux', property: 'PreferRemux', type: 'checkbox' }
 ]);
 
-const SECRET_LABELS = Object.freeze({
+// Labels are dictionary keys: they are resolved when rendered, so they follow the active UI language.
+const SECRET_LABEL_KEYS = Object.freeze({
     apiKey: {
-        configured: 'Chiave salvata',
-        missing: 'Nessuna chiave salvata',
-        keepPlaceholder: 'Lascia vuoto per mantenere la chiave salvata',
-        newPlaceholder: 'Incolla la API key TorrentClaw'
+        configured: 'settings.apiKey.configured',
+        missing: 'settings.apiKey.missing',
+        keepPlaceholder: 'settings.apiKey.placeholder.keep',
+        newPlaceholder: 'settings.apiKey.placeholder.new'
     },
     password: {
-        configured: 'Password salvata',
-        missing: 'Nessuna password salvata',
-        keepPlaceholder: 'Lascia vuoto per mantenerla',
-        newPlaceholder: 'Password della WebUI'
+        configured: 'settings.qbittorrent.password.configured',
+        missing: 'settings.qbittorrent.password.missing',
+        keepPlaceholder: 'settings.qbittorrent.password.placeholder.keep',
+        newPlaceholder: 'settings.qbittorrent.password.placeholder.new'
     }
 });
 
 const CONNECTION_RESULTS = Object.freeze({
-    Connected: { text: 'Connessione riuscita', tone: 'success' },
-    InvalidApiKey: { text: 'API key non valida', tone: 'error' },
-    Unauthorized: { text: 'Credenziali non autorizzate', tone: 'error' },
-    ServiceUnavailable: { text: 'Servizio non raggiungibile', tone: 'error' },
-    Timeout: { text: 'Tempo scaduto', tone: 'error' },
-    ConfigurationError: { text: 'Configurazione non valida', tone: 'error' }
+    Connected: { key: 'settings.connection.Connected', tone: 'success' },
+    InvalidApiKey: { key: 'settings.connection.InvalidApiKey', tone: 'error' },
+    Unauthorized: { key: 'settings.connection.Unauthorized', tone: 'error' },
+    ServiceUnavailable: { key: 'settings.connection.ServiceUnavailable', tone: 'error' },
+    Timeout: { key: 'settings.connection.Timeout', tone: 'error' },
+    ConfigurationError: { key: 'settings.connection.ConfigurationError', tone: 'error' }
 });
 
 /* =============================================================================
@@ -95,10 +123,24 @@ function createElement(tagName, options = {}) {
     return element;
 }
 
-function showStatus(statusElement, message, tone) {
-    statusElement.textContent = message;
-    statusElement.dataset.tone = tone;
-    statusElement.hidden = false;
+function renderStatus(statusElement, status) {
+    statusElement.textContent = resolveMessage(status.descriptor);
+    if (status.tone) {
+        statusElement.dataset.tone = status.tone;
+        statusElement.hidden = false;
+    }
+}
+
+/** Shows a message that is kept as a descriptor, so it can be shown again in another language. */
+function showStatus(page, statusElement, descriptor, tone) {
+    const status = { descriptor, tone };
+    page.state.statuses.set(statusElement, status);
+    renderStatus(statusElement, status);
+}
+
+/** Message shown for a failed request; anything that is not a RequestError gets a generic text. */
+function describeError(error) {
+    return error?.descriptor ?? message('error.generic');
 }
 
 function getControl(page, rule) {
@@ -109,18 +151,20 @@ function getErrorElement(page, rule) {
     return page.view.querySelector(`#${rule.id}Error`);
 }
 
-function setFieldError(page, rule, message) {
+function setFieldError(page, rule, problem) {
     const control = getControl(page, rule);
     const errorElement = getErrorElement(page, rule);
-    if (message) {
+    if (problem) {
+        page.state.fieldErrors.set(rule.id, problem);
         control.setAttribute('aria-invalid', 'true');
     } else {
+        page.state.fieldErrors.delete(rule.id);
         control.removeAttribute('aria-invalid');
     }
 
     if (errorElement) {
-        errorElement.textContent = message ?? '';
-        errorElement.hidden = !message;
+        errorElement.textContent = resolveMessage(problem);
+        errorElement.hidden = !problem;
     }
 }
 
@@ -136,33 +180,34 @@ function setSelectValue(select, value) {
 }
 
 function formatTime(date) {
-    return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 /* =============================================================================
  * Validation
  * ========================================================================== */
 
+/** Validation results are message descriptors (or null when the value is valid), resolved when displayed. */
 export function getUrlError(rawValue, { required, httpsOnly }) {
     const value = rawValue.trim();
     if (value === '') {
-        return required ? 'Campo obbligatorio.' : null;
+        return required ? message('validation.required') : null;
     }
 
     let url;
     try {
         url = new URL(value);
     } catch {
-        return 'Inserisci un URL completo, ad esempio https://esempio.it';
+        return message('validation.url.full');
     }
 
     const allowedProtocols = httpsOnly ? ['https:'] : ['http:', 'https:'];
     if (!allowedProtocols.includes(url.protocol)) {
-        return httpsOnly ? 'È consentito solo HTTPS.' : 'Usa un indirizzo HTTP o HTTPS.';
+        return message(httpsOnly ? 'validation.url.httpsOnly' : 'validation.url.httpOrHttps');
     }
 
     if (url.username || url.password) {
-        return 'Non inserire credenziali nell\'URL: usa i campi dedicati.';
+        return message('validation.url.credentials');
     }
 
     return null;
@@ -171,20 +216,20 @@ export function getUrlError(rawValue, { required, httpsOnly }) {
 export function getNumberError(rawValue, { min, max, integerOnly, allowEmpty }) {
     const value = rawValue.trim();
     if (value === '') {
-        return allowEmpty ? null : 'Campo obbligatorio.';
+        return allowEmpty ? null : message('validation.required');
     }
 
     const number = Number(value);
     if (!Number.isFinite(number) || (integerOnly && !Number.isInteger(number))) {
-        return integerOnly ? 'Inserisci un numero intero.' : 'Inserisci un numero.';
+        return message(integerOnly ? 'validation.integer' : 'validation.number');
     }
 
     if (min !== undefined && number < min) {
-        return max === undefined ? `Il valore minimo è ${min}.` : `Inserisci un valore tra ${min} e ${max}.`;
+        return max === undefined ? message('validation.min', { min }) : message('validation.range', { min, max });
     }
 
     if (max !== undefined && number > max) {
-        return `Inserisci un valore tra ${min} e ${max}.`;
+        return message('validation.range', { min, max });
     }
 
     return null;
@@ -207,9 +252,9 @@ function validateField(page, rule) {
 function validateForm(page) {
     let firstInvalidControl = null;
     for (const rule of FIELD_RULES) {
-        const message = validateField(page, rule);
-        setFieldError(page, rule, message);
-        if (message && !firstInvalidControl) {
+        const problem = validateField(page, rule);
+        setFieldError(page, rule, problem);
+        if (problem && !firstInvalidControl) {
             firstInvalidControl = getControl(page, rule);
         }
     }
@@ -223,9 +268,10 @@ function validateForm(page) {
  * ========================================================================== */
 
 class RequestError extends Error {
-    constructor(message, status) {
-        super(message);
+    constructor(descriptor, status) {
+        super(descriptor.key);
         this.name = 'RequestError';
+        this.descriptor = descriptor;
         this.status = status;
     }
 }
@@ -265,7 +311,7 @@ async function toRequestError(failure) {
     }
 
     if (!failure || typeof failure.status !== 'number') {
-        return new RequestError('Impossibile contattare il server Jellyfin. Controlla la connessione e riprova.', 0);
+        return new RequestError(message('error.network'), 0);
     }
 
     const problem = await readProblemDetails(failure);
@@ -283,22 +329,22 @@ async function readProblemDetails(response) {
 
 function describeFailure(status, problem) {
     if (problem?.errors) {
-        return 'Alcuni valori non sono validi. Controlla i campi e riprova.';
+        return message('settings.error.validation');
     }
 
     if (problem?.title && problem?.detail) {
-        return `${problem.title}. ${problem.detail}`;
+        return message('common.reason', { title: problem.title, detail: problem.detail });
     }
 
     if (status === 401 || status === 403) {
-        return 'Sessione scaduta o permessi insufficienti: accedi di nuovo come amministratore.';
+        return message('error.unauthorized');
     }
 
     if (status >= 500) {
-        return 'Il server ha riscontrato un errore imprevisto. Riprova più tardi.';
+        return message('error.server');
     }
 
-    return 'La richiesta non è andata a buon fine. Riprova.';
+    return message('error.generic');
 }
 
 function fetchConfiguration() {
@@ -338,7 +384,12 @@ function createPageState() {
     return {
         lifetime: new AbortController(),
         isBusy: false,
-        hasUnsavedChanges: false
+        hasUnsavedChanges: false,
+        // Language-independent state, kept so the visible texts can be rendered again when the language changes.
+        fieldErrors: new Map(),
+        statuses: new Map(),
+        secretStates: { apiKey: false, password: false },
+        unsubscribeLanguage: null
     };
 }
 
@@ -394,18 +445,41 @@ function fillForm(page, configuration) {
         setFieldError(page, rule, null);
     }
 
-    renderSecretState(page.elements.apiKeyState, page.elements.apiKeyInput, configuration.TorrentClawApiKeyConfigured, SECRET_LABELS.apiKey);
-    renderSecretState(page.elements.passwordState, page.elements.passwordInput, configuration.QbittorrentPasswordConfigured, SECRET_LABELS.password);
+    page.state.secretStates.apiKey = Boolean(configuration.TorrentClawApiKeyConfigured);
+    page.state.secretStates.password = Boolean(configuration.QbittorrentPasswordConfigured);
+    renderSecretStates(page);
 }
 
-function renderSecretState(stateElement, input, isConfigured, labels) {
-    stateElement.dataset.configured = String(Boolean(isConfigured));
-    stateElement.textContent = isConfigured ? labels.configured : labels.missing;
-    input.placeholder = isConfigured ? labels.keepPlaceholder : labels.newPlaceholder;
+function renderSecretStates(page) {
+    const { elements, state } = page;
+    renderSecretState(elements.apiKeyState, elements.apiKeyInput, state.secretStates.apiKey, SECRET_LABEL_KEYS.apiKey);
+    renderSecretState(elements.passwordState, elements.passwordInput, state.secretStates.password, SECRET_LABEL_KEYS.password);
 }
 
-function renderSaveState(page, message, tone) {
-    showStatus(page.elements.saveState, message, tone);
+function renderSecretState(stateElement, input, isConfigured, labelKeys) {
+    stateElement.dataset.configured = String(isConfigured);
+    stateElement.textContent = resolveMessage(message(isConfigured ? labelKeys.configured : labelKeys.missing));
+    input.placeholder = resolveMessage(message(isConfigured ? labelKeys.keepPlaceholder : labelKeys.newPlaceholder));
+}
+
+function renderSaveState(page, descriptor, tone) {
+    showStatus(page, page.elements.saveState, descriptor, tone);
+}
+
+/** Refreshes every text that is not covered by the data-i18n markers of the HTML. */
+function renderLanguage(page) {
+    translatePage(page.view);
+    renderSecretStates(page);
+    for (const rule of FIELD_RULES) {
+        const errorElement = getErrorElement(page, rule);
+        if (errorElement) {
+            errorElement.textContent = resolveMessage(page.state.fieldErrors.get(rule.id));
+        }
+    }
+
+    for (const [statusElement, status] of page.state.statuses) {
+        renderStatus(statusElement, status);
+    }
 }
 
 function setBusy(page, isBusy) {
@@ -425,14 +499,17 @@ function clearSecretInputs(page) {
 function describeConnectionResult(result) {
     const knownResult = CONNECTION_RESULTS[result?.Status];
     if (!knownResult) {
-        return { text: 'Risultato della verifica non riconosciuto', tone: 'error' };
+        return { descriptor: message('settings.connection.unrecognised'), tone: 'error' };
     }
 
     if (result.Status === 'ConfigurationError' && result.Message) {
-        return { text: `${knownResult.text}: ${result.Message}`, tone: knownResult.tone };
+        return {
+            descriptor: message('settings.connection.ConfigurationErrorWithMessage', { message: String(result.Message) }),
+            tone: knownResult.tone
+        };
     }
 
-    return knownResult;
+    return { descriptor: message(knownResult.key), tone: knownResult.tone };
 }
 
 /* =============================================================================
@@ -445,9 +522,9 @@ async function loadSettings(page) {
         const configuration = await fetchConfiguration();
         fillForm(page, configuration);
         page.state.hasUnsavedChanges = false;
-        renderSaveState(page, 'Impostazioni caricate.', 'info');
+        renderSaveState(page, message('settings.status.loaded'), 'info');
     } catch (error) {
-        renderSaveState(page, `Impostazioni non caricate. ${error.message}`, 'error');
+        renderSaveState(page, message('settings.status.loadFailed', { reason: describeError(error) }), 'error');
     } finally {
         setBusy(page, false);
     }
@@ -455,7 +532,7 @@ async function loadSettings(page) {
 
 async function saveSettings(page) {
     if (!validateForm(page)) {
-        renderSaveState(page, 'Correggi i campi evidenziati prima di salvare.', 'error');
+        renderSaveState(page, message('settings.status.fixFields'), 'error');
         return false;
     }
 
@@ -463,10 +540,11 @@ async function saveSettings(page) {
         await saveConfiguration(readConfigurationUpdate(page));
         fillForm(page, await fetchConfiguration());
         page.state.hasUnsavedChanges = false;
-        renderSaveState(page, `Impostazioni salvate alle ${formatTime(new Date())}.`, 'success');
+        const savedAt = new Date();
+        renderSaveState(page, message('settings.status.saved', { time: () => formatTime(savedAt) }), 'success');
         return true;
     } catch (error) {
-        renderSaveState(page, error.message, 'error');
+        renderSaveState(page, describeError(error), 'error');
         return false;
     }
 }
@@ -491,18 +569,18 @@ async function handleConnectionTest(page, { endpoint, resultElement }) {
     }
 
     setBusy(page, true);
-    showStatus(resultElement, 'Salvataggio e verifica in corso', 'loading');
+    showStatus(page, resultElement, message('settings.status.testing'), 'loading');
     try {
         const saved = await saveSettings(page);
         if (!saved) {
-            showStatus(resultElement, 'Verifica non eseguita: impostazioni non salvate', 'error');
+            showStatus(page, resultElement, message('settings.status.testSkipped'), 'error');
             return;
         }
 
         const outcome = describeConnectionResult(await testConnection(endpoint));
-        showStatus(resultElement, outcome.text, outcome.tone);
+        showStatus(page, resultElement, outcome.descriptor, outcome.tone);
     } catch (error) {
-        showStatus(resultElement, error.message, 'error');
+        showStatus(page, resultElement, describeError(error), 'error');
     } finally {
         setBusy(page, false);
     }
@@ -516,7 +594,7 @@ function handleFormEdit(page, event) {
 
     if (!page.state.hasUnsavedChanges) {
         page.state.hasUnsavedChanges = true;
-        renderSaveState(page, 'Modifiche non salvate', 'pending');
+        renderSaveState(page, message('settings.status.unsaved'), 'pending');
     }
 }
 
@@ -552,15 +630,30 @@ function handleViewHide(page) {
 
 function handleViewDestroy(page) {
     clearSecretInputs(page);
+    page.state.unsubscribeLanguage?.();
     page.state.lifetime.abort();
 }
 
-export default function SettingsPageController(view) {
+function initializePage(view) {
     const page = { view, elements: queryPageElements(view), state: createPageState() };
     const listenerOptions = { signal: page.state.lifetime.signal };
 
+    // Translation runs before any asynchronous rendering. Later language changes only update texts in place.
+    page.state.statuses.set(page.elements.saveState, { descriptor: message('settings.save.loading') });
+    renderLanguage(page);
+    bindLanguagePicker(view, { signal: page.state.lifetime.signal });
+    page.state.unsubscribeLanguage = onLanguageChange(() => renderLanguage(page));
     bindEventHandlers(page);
     view.addEventListener('viewshow', () => handleViewShow(page), listenerOptions);
     view.addEventListener('viewhide', () => handleViewHide(page), listenerOptions);
     view.addEventListener('viewdestroy', () => handleViewDestroy(page), { once: true });
+
+    // The view may already be on screen: its "viewshow" event can have fired while the module was loading.
+    if (!view.classList.contains('hide')) {
+        handleViewShow(page);
+    }
+}
+
+export default function SettingsPageController(view) {
+    i18nReady.then(() => initializePage(view));
 }

@@ -4,6 +4,7 @@
      data-require="emby-input,emby-button,emby-select,emby-checkbox"
      data-controller="__plugin/TorrentClawSearch.js">
     <link rel="stylesheet" href="configurationpage?name=TorrentClawSearch.css">
+    <link rel="stylesheet" href="configurationpage?name=TorrentClawShared.css">
 
     <div data-role="content">
         <div class="content-primary tc-shell">
@@ -11,69 +12,84 @@
             <header class="tc-header">
                 <div class="tc-header-text">
                     <p class="tc-eyebrow">TorrentClaw</p>
-                    <h1 class="tc-title">Cerca release</h1>
-                    <p class="tc-lead">Cerca su TorrentClaw, confronta qualità, lingue e disponibilità, poi invia manualmente la release scelta a qBittorrent.</p>
+                    <h1 class="tc-title" data-i18n="search.title">Search releases</h1>
+                    <p class="tc-lead" data-i18n="search.lead">Search TorrentClaw, compare quality, languages and availability, then manually send the chosen release to qBittorrent.</p>
                 </div>
-                <nav class="tc-nav" aria-label="Pagine TorrentClaw">
-                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch" aria-current="page">Cerca</a>
-                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads">Download</a>
-                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings">Impostazioni</a>
+                <nav class="tc-nav" aria-label="TorrentClaw pages" data-i18n-attr="aria-label:nav.label">
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSearch" aria-current="page" data-i18n="nav.search">Search</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawDownloads" data-i18n="nav.downloads">Downloads</a>
+                    <a class="tc-nav-link" href="#/configurationpage?name=TorrentClawSettings" data-i18n="nav.settings">Settings</a>
                 </nav>
+                <div class="tc-lang" data-language-picker>
+                    <button type="button" class="tc-lang-button" data-language-button aria-haspopup="listbox" aria-expanded="false" aria-controls="tcSearchLanguageList" aria-label="Interface language: English" title="Interface language: English">
+                        <span class="tc-lang-current" data-language-current aria-hidden="true"></span>
+                    </button>
+                    <ul id="tcSearchLanguageList" class="tc-lang-list" role="listbox" data-language-list aria-label="Interface language" hidden>
+                        <li class="tc-lang-option" role="option" data-language="en" aria-selected="true" tabindex="-1" title="English" data-i18n-attr="title:language.en">
+                            <svg class="tc-lang-flag" data-flag="en" viewBox="0 0 30 20" width="30" height="20" aria-hidden="true" focusable="false"></svg>
+                            <span class="tc-sr-only" data-i18n="language.en">English</span>
+                        </li>
+                        <li class="tc-lang-option" role="option" data-language="it" aria-selected="false" tabindex="-1" title="Italian" data-i18n-attr="title:language.it">
+                            <svg class="tc-lang-flag" data-flag="it" viewBox="0 0 30 20" width="30" height="20" aria-hidden="true" focusable="false"></svg>
+                            <span class="tc-sr-only" data-i18n="language.it">Italian</span>
+                        </li>
+                    </ul>
+                </div>
             </header>
 
             <form id="tcSearchForm" class="tc-search-form" novalidate>
                 <fieldset class="tc-query-group">
-                    <legend class="tc-group-legend">Contenuto</legend>
+                    <legend class="tc-group-legend" data-i18n="search.content.legend">Content</legend>
                     <div class="tc-query-row">
                         <div class="inputContainer tc-field">
-                            <label class="inputLabel" for="tcQuery">Titolo</label>
+                            <label class="inputLabel" for="tcQuery" data-i18n="search.query.label">Title</label>
                             <input is="emby-input" id="tcQuery" type="search" required maxlength="200" autocomplete="off" aria-describedby="tcQueryError">
                             <p id="tcQueryError" class="tc-field-error" hidden></p>
                         </div>
                         <div class="selectContainer tc-field">
-                            <label class="selectLabel" for="tcType">Tipo</label>
+                            <label class="selectLabel" for="tcType" data-i18n="search.type.label">Type</label>
                             <select is="emby-select" id="tcType">
-                                <option value="0">Film</option>
-                                <option value="1">Serie TV</option>
+                                <option value="0" data-i18n="search.type.movie">Movie</option>
+                                <option value="1" data-i18n="search.type.show">TV series</option>
                             </select>
                         </div>
                         <button is="emby-button" id="tcSearchButton" type="submit" class="raised button-submit tc-search-submit">
-                            <span>Cerca</span>
+                            <span data-i18n="search.button">Search</span>
                         </button>
                     </div>
                 </fieldset>
 
                 <details id="tcFilters" class="tc-filters" open>
                     <summary class="tc-filters-summary">
-                        <span>Filtri</span>
+                        <span data-i18n="search.filters.title">Filters</span>
                         <span id="tcFilterCount" class="tc-filter-count" hidden></span>
                     </summary>
 
                     <div class="tc-filter-groups">
                         <fieldset class="tc-filter-group">
-                            <legend class="tc-group-legend">Video</legend>
+                            <legend class="tc-group-legend" data-i18n="search.filters.video">Video</legend>
                             <div class="selectContainer tc-field">
-                                <label class="selectLabel" for="tcResolution">Risoluzione</label>
+                                <label class="selectLabel" for="tcResolution" data-i18n="search.filters.resolution">Resolution</label>
                                 <select is="emby-select" id="tcResolution">
-                                    <option value="">Qualsiasi</option>
+                                    <option value="" data-i18n="common.any">Any</option>
                                     <option value="720p">720p</option>
                                     <option value="1080p">1080p</option>
                                     <option value="2160p">2160p (4K)</option>
                                 </select>
                             </div>
                             <div class="selectContainer tc-field">
-                                <label class="selectLabel" for="tcCodec">Codec</label>
+                                <label class="selectLabel" for="tcCodec" data-i18n="search.filters.codec">Codec</label>
                                 <select is="emby-select" id="tcCodec">
-                                    <option value="">Qualsiasi</option>
+                                    <option value="" data-i18n="common.any">Any</option>
                                     <option value="AVC">H.264 / AVC</option>
                                     <option value="HEVC">H.265 / HEVC</option>
                                     <option value="AV1">AV1</option>
                                 </select>
                             </div>
                             <div class="selectContainer tc-field">
-                                <label class="selectLabel" for="tcHdr">HDR</label>
+                                <label class="selectLabel" for="tcHdr" data-i18n="search.filters.hdr">HDR</label>
                                 <select is="emby-select" id="tcHdr">
-                                    <option value="">Qualsiasi</option>
+                                    <option value="" data-i18n="common.any">Any</option>
                                     <option value="SDR">SDR</option>
                                     <option value="HDR10">HDR10</option>
                                     <option value="HDR10+">HDR10+</option>
@@ -83,76 +99,76 @@
                             <div class="checkboxContainer tc-field">
                                 <label>
                                     <input is="emby-checkbox" id="tcPreferRemux" type="checkbox">
-                                    <span>Preferisci REMUX</span>
+                                    <span data-i18n="search.filters.remux">Prefer REMUX</span>
                                 </label>
                             </div>
                         </fieldset>
 
                         <fieldset class="tc-filter-group">
-                            <legend class="tc-group-legend">Audio e sottotitoli</legend>
+                            <legend class="tc-group-legend" data-i18n="search.filters.audioAndSubtitles">Audio and subtitles</legend>
                             <div class="selectContainer tc-field">
-                                <label class="selectLabel" for="tcAudioLanguage">Lingua audio</label>
+                                <label class="selectLabel" for="tcAudioLanguage" data-i18n="search.filters.audioLanguage">Audio language</label>
                                 <select is="emby-select" id="tcAudioLanguage">
-                                    <option value="">Qualsiasi</option>
-                                    <option value="it">Italiano</option>
-                                    <option value="en">Inglese</option>
-                                    <option value="it,en">Italiano + Inglese</option>
-                                    <option value="fr">Francese</option>
-                                    <option value="es">Spagnolo</option>
-                                    <option value="de">Tedesco</option>
-                                    <option value="ja">Giapponese</option>
-                                    <option value="pt">Portoghese</option>
-                                    <option value="ru">Russo</option>
+                                    <option value="" data-i18n="common.any">Any</option>
+                                    <option value="it" data-i18n="language.it">Italian</option>
+                                    <option value="en" data-i18n="language.en">English</option>
+                                    <option value="it,en" data-i18n="language.itEn">Italian + English</option>
+                                    <option value="fr" data-i18n="language.fr">French</option>
+                                    <option value="es" data-i18n="language.es">Spanish</option>
+                                    <option value="de" data-i18n="language.de">German</option>
+                                    <option value="ja" data-i18n="language.ja">Japanese</option>
+                                    <option value="pt" data-i18n="language.pt">Portuguese</option>
+                                    <option value="ru" data-i18n="language.ru">Russian</option>
                                 </select>
                             </div>
                             <div class="selectContainer tc-field">
-                                <label class="selectLabel" for="tcSubtitleLanguage">Sottotitoli</label>
+                                <label class="selectLabel" for="tcSubtitleLanguage" data-i18n="search.filters.subtitleLanguage">Subtitles</label>
                                 <select is="emby-select" id="tcSubtitleLanguage">
-                                    <option value="">Qualsiasi</option>
-                                    <option value="it">Italiano</option>
-                                    <option value="en">Inglese</option>
-                                    <option value="it,en">Italiano + Inglese</option>
-                                    <option value="none">Nessun sottotitolo</option>
-                                    <option value="fr">Francese</option>
-                                    <option value="es">Spagnolo</option>
-                                    <option value="de">Tedesco</option>
-                                    <option value="ja">Giapponese</option>
-                                    <option value="pt">Portoghese</option>
-                                    <option value="ru">Russo</option>
+                                    <option value="" data-i18n="common.any">Any</option>
+                                    <option value="it" data-i18n="language.it">Italian</option>
+                                    <option value="en" data-i18n="language.en">English</option>
+                                    <option value="it,en" data-i18n="language.itEn">Italian + English</option>
+                                    <option value="none" data-i18n="language.noSubtitles">No subtitles</option>
+                                    <option value="fr" data-i18n="language.fr">French</option>
+                                    <option value="es" data-i18n="language.es">Spanish</option>
+                                    <option value="de" data-i18n="language.de">German</option>
+                                    <option value="ja" data-i18n="language.ja">Japanese</option>
+                                    <option value="pt" data-i18n="language.pt">Portuguese</option>
+                                    <option value="ru" data-i18n="language.ru">Russian</option>
                                 </select>
                             </div>
                             <div class="inputContainer tc-field">
-                                <label class="inputLabel" for="tcAudioFormat">Formato audio</label>
-                                <input is="emby-input" id="tcAudioFormat" type="text" maxlength="40" autocomplete="off" placeholder="Atmos, DTS, AAC…">
+                                <label class="inputLabel" for="tcAudioFormat" data-i18n="search.filters.audioFormat">Audio format</label>
+                                <input is="emby-input" id="tcAudioFormat" type="text" maxlength="40" autocomplete="off" placeholder="Atmos, DTS, AAC…" data-i18n-attr="placeholder:search.filters.audioFormatPlaceholder">
                             </div>
-                            <p class="tc-hint">Audio e sottotitoli sono filtri distinti: con più lingue devono essere presenti tutte.</p>
+                            <p class="tc-hint" data-i18n="search.filters.audioHint">Audio and subtitles are separate filters: with several languages, all of them must be present.</p>
                         </fieldset>
 
                         <fieldset class="tc-filter-group">
-                            <legend class="tc-group-legend">Disponibilità</legend>
+                            <legend class="tc-group-legend" data-i18n="search.filters.availability">Availability</legend>
                             <div class="inputContainer tc-field">
-                                <label class="inputLabel" for="tcMaxSize">Dimensione massima (GB)</label>
+                                <label class="inputLabel" for="tcMaxSize" data-i18n="search.filters.maxSize">Maximum size (GB)</label>
                                 <input is="emby-input" id="tcMaxSize" type="number" min="0" step="0.1" inputmode="decimal" aria-describedby="tcMaxSizeError">
                                 <p id="tcMaxSizeError" class="tc-field-error" hidden></p>
                             </div>
                             <div class="inputContainer tc-field">
-                                <label class="inputLabel" for="tcMinSeeders">Seeders minimi</label>
+                                <label class="inputLabel" for="tcMinSeeders" data-i18n="search.filters.minSeeders">Minimum seeders</label>
                                 <input is="emby-input" id="tcMinSeeders" type="number" min="0" step="1" inputmode="numeric" aria-describedby="tcMinSeedersError">
                                 <p id="tcMinSeedersError" class="tc-field-error" hidden></p>
                             </div>
                             <div class="selectContainer tc-field">
-                                <label class="selectLabel" for="tcSort">Ordina per</label>
+                                <label class="selectLabel" for="tcSort" data-i18n="search.filters.sort">Sort by</label>
                                 <select is="emby-select" id="tcSort">
-                                    <option value="0">Compatibilità</option>
-                                    <option value="1">Qualità</option>
-                                    <option value="2">Seeders</option>
-                                    <option value="3">Dimensione</option>
+                                    <option value="0" data-i18n="search.filters.sort.compatibility">Compatibility</option>
+                                    <option value="1" data-i18n="search.filters.sort.quality">Quality</option>
+                                    <option value="2" data-i18n="search.filters.sort.seeders">Seeders</option>
+                                    <option value="3" data-i18n="search.filters.sort.size">Size</option>
                                 </select>
                             </div>
                             <div class="checkboxContainer tc-field">
                                 <label>
                                     <input is="emby-checkbox" id="tcVerifiedOnly" type="checkbox">
-                                    <span>Solo release verificate TrueSpec</span>
+                                    <span data-i18n="search.filters.verifiedOnly">Only TrueSpec-verified releases</span>
                                 </label>
                             </div>
                         </fieldset>
@@ -160,9 +176,9 @@
                 </details>
 
                 <div class="tc-active-filters" aria-live="polite">
-                    <span class="tc-active-filters-label">Filtri attivi:</span>
+                    <span class="tc-active-filters-label" data-i18n="search.active.label">Active filters:</span>
                     <ul id="tcActiveFilterList" class="tc-chip-list"></ul>
-                    <span id="tcNoActiveFilters" class="tc-active-filters-empty">nessuno</span>
+                    <span id="tcNoActiveFilters" class="tc-active-filters-empty" data-i18n="search.active.none">none</span>
                 </div>
             </form>
 
@@ -170,7 +186,7 @@
 
             <section class="tc-results" aria-labelledby="tcResultsTitle">
                 <div id="tcResultsHeader" class="tc-results-header" hidden>
-                    <h2 id="tcResultsTitle" class="tc-section-title">Risultati</h2>
+                    <h2 id="tcResultsTitle" class="tc-section-title" data-i18n="search.results.title">Results</h2>
                     <p id="tcResultsCount" class="tc-results-count"></p>
                 </div>
 
@@ -211,8 +227,8 @@
                         <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
                         <path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
                     </svg>
-                    <p class="tc-empty-title">Pronto per la ricerca</p>
-                    <p class="tc-empty-text">Inserisci un titolo: i filtri predefiniti arrivano dalle Impostazioni. Nessun download parte senza il tuo clic.</p>
+                    <p class="tc-empty-title" data-i18n="search.intro.title">Ready to search</p>
+                    <p class="tc-empty-text" data-i18n="search.intro.text">Enter a title: the default filters come from Settings. No download starts without your click.</p>
                 </div>
 
                 <div id="tcEmptyState" class="tc-empty" hidden>
@@ -220,8 +236,8 @@
                         <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
                         <path d="M15.5 15.5 21 21M8 8.5l5 4M13 8.5l-5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
                     </svg>
-                    <p class="tc-empty-title">Nessuna release trovata</p>
-                    <p class="tc-empty-text">Prova a controllare il titolo, a scegliere il tipo corretto oppure a rimuovere alcuni filtri attivi.</p>
+                    <p class="tc-empty-title" data-i18n="search.empty.title">No releases found</p>
+                    <p class="tc-empty-text" data-i18n="search.empty.text">Try checking the title, choosing the correct type or removing some active filters.</p>
                 </div>
             </section>
         </div>

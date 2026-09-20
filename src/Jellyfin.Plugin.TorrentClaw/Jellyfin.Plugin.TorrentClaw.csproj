@@ -27,5 +27,7 @@
     <EmbeddedResource Include="Web\Settings\settings.html" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.html" />
     <EmbeddedResource Include="Web\Settings\settings.css" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.css" />
     <EmbeddedResource Include="Web\Settings\settings.js" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Settings.settings.js" />
+    <EmbeddedResource Include="Web\Shared\torrentclaw-i18n.js" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Shared.torrentclaw-i18n.js" />
+    <EmbeddedResource Include="Web\Shared\torrentclaw-shared.css" LogicalName="Jellyfin.Plugin.TorrentClaw.Web.Shared.torrentclaw-shared.css" />
   </ItemGroup>
 </Project>
